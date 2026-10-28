@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { StarMark } from "@/components/Logo";
+import type { PublicUser } from "@/lib/auth";
+import { PLANS } from "@/lib/plans";
 
 type Source = { url: string; title: string };
 type Message = {
@@ -17,7 +20,6 @@ type Message = {
 };
 type ConvoSummary = { id: string; title: string; updatedAt: number };
 
-const SPACE_KEY = "antares.space";
 const POLL_MS = 1500;
 
 function detectDevice(): string {
@@ -28,25 +30,11 @@ function detectDevice(): string {
   return "Computer";
 }
 
-function readSpace(): string | null {
-  try {
-    return localStorage.getItem(SPACE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function saveSpace(id: string) {
-  try {
-    localStorage.setItem(SPACE_KEY, id);
-  } catch {
-    /* private mode: space lives for this tab only */
-  }
-}
-
 export default function ChatApp() {
-  const [spaceId, setSpaceId] = useState<string | null>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<PublicUser | null>(null);
   const [live, setLive] = useState(true);
+  const [notice, setNotice] = useState<{ text: string; upgrade?: boolean } | null>(null);
   const [convos, setConvos] = useState<ConvoSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -60,52 +48,42 @@ export default function ChatApp() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
 
-  // Join or create the user's sync space. A ?link=CODE in the URL joins an existing one.
+  const loadMe = useCallback(async () => {
+    const res = await fetch("/api/me");
+    if (res.status === 401) {
+      router.push("/signin?next=/chat");
+      return;
+    }
+    const data = await res.json();
+    setUser(data.user);
+    setLive(data.live);
+  }, [router]);
+
+  // Every device signed into the same account shares one conversation space.
   useEffect(() => {
     (async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("link");
-      if (code) {
-        const res = await fetch(`/api/link?code=${encodeURIComponent(code)}`);
-        if (res.ok) {
-          const { spaceId } = await res.json();
-          saveSpace(spaceId);
-        }
-        window.history.replaceState(null, "", "/chat");
-      }
-      let id = readSpace();
-      if (id) {
-        const check = await fetch(`/api/space?space=${id}`).then((r) => r.json());
-        setLive(check.live);
-        if (!check.exists) id = null;
-      }
-      if (!id) {
-        const created = await fetch("/api/space", { method: "POST" }).then((r) => r.json());
-        id = created.spaceId as string;
-        saveSpace(id);
-      }
+      await loadMe();
       setDevice(detectDevice());
-      setSpaceId(id);
     })();
-  }, []);
+  }, [loadMe]);
 
   const refreshConvos = useCallback(async () => {
-    if (!spaceId) return;
-    const res = await fetch(`/api/conversations?space=${spaceId}`);
+    if (!user) return;
+    const res = await fetch("/api/conversations");
     if (!res.ok) return;
     const { conversations } = await res.json();
     setConvos(conversations);
     // Follow the most recently active conversation, which is how a handoff lands on this device.
     setActiveId((cur) => cur ?? conversations[0]?.id ?? null);
-  }, [spaceId]);
+  }, [user]);
 
   const refreshActive = useCallback(async () => {
-    if (!spaceId || !activeId || sendingRef.current) return;
-    const res = await fetch(`/api/conversations/${activeId}?space=${spaceId}`);
+    if (!user || !activeId || sendingRef.current) return;
+    const res = await fetch(`/api/conversations/${activeId}`);
     if (!res.ok) return;
     const { conversation } = await res.json();
     if (!sendingRef.current) setMessages(conversation.messages);
-  }, [spaceId, activeId]);
+  }, [user, activeId]);
 
   useEffect(() => {
     const tick = () => {
@@ -125,12 +103,8 @@ export default function ChatApp() {
   }, [messages, status]);
 
   async function newConversation() {
-    if (!spaceId) return null;
-    const { conversation } = await fetch("/api/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spaceId }),
-    }).then((r) => r.json());
+    if (!user) return null;
+    const { conversation } = await fetch("/api/conversations", { method: "POST" }).then((r) => r.json());
     setActiveId(conversation.id);
     setMessages([]);
     setSidebarOpen(false);
@@ -139,8 +113,7 @@ export default function ChatApp() {
   }
 
   async function deleteConversation(id: string) {
-    if (!spaceId) return;
-    await fetch(`/api/conversations/${id}?space=${spaceId}`, { method: "DELETE" });
+    await fetch(`/api/conversations/${id}`, { method: "DELETE" });
     if (id === activeId) {
       setActiveId(null);
       setMessages([]);
@@ -150,18 +123,20 @@ export default function ChatApp() {
 
   async function send() {
     const text = input.trim();
-    if (!text || sending || !spaceId) return;
+    if (!text || sending || !user) return;
     const convoId = activeId ?? (await newConversation());
     if (!convoId) return;
 
     setInput("");
+    setNotice(null);
     setSending(true);
     sendingRef.current = true;
     setStatus(research ? "Researching…" : "Thinking…");
     const pendingId = `pending-${Date.now()}`;
+    const userMsgId = `u-${Date.now()}`;
     setMessages((m) => [
       ...m,
-      { id: `u-${Date.now()}`, role: "user", text, device },
+      { id: userMsgId, role: "user", text, device },
       { id: pendingId, role: "assistant", text: "", sources: [], streaming: true },
     ]);
 
@@ -173,14 +148,20 @@ export default function ChatApp() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          spaceId,
           conversationId: convoId,
           text,
           mode: research ? "research" : "chat",
           device,
         }),
       });
-      if (!res.ok || !res.body) throw new Error(await res.text());
+      if (!res.ok || !res.body) {
+        // Plan limits and sign-in problems: undo the optimistic messages and explain.
+        const data = await res.json().catch(() => ({}));
+        setMessages((all) => all.filter((m) => m.id !== pendingId && m.id !== userMsgId));
+        setInput(text);
+        setNotice({ text: data.error ?? "Couldn't reach Antares. Please try again.", upgrade: data.upgrade });
+        return;
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -214,6 +195,7 @@ export default function ChatApp() {
       setSending(false);
       sendingRef.current = false;
       refreshConvos();
+      loadMe();
     }
   }
 
@@ -274,7 +256,25 @@ export default function ChatApp() {
           >
             🔗 Link another device
           </button>
-          <p className="mt-2 px-1 text-xs text-muted">This device: {device}</p>
+          {user && (
+            <Link
+              href="/account"
+              className="mt-3 flex items-center justify-between rounded-xl px-2 py-2 text-sm hover:bg-surface-2"
+            >
+              <span className="min-w-0">
+                <span className="block truncate">{user.name}</span>
+                <span className="block text-xs text-muted">
+                  {PLANS[user.plan].name} · {user.usedToday}/{user.dailyLimit.toLocaleString()} today
+                </span>
+              </span>
+              {user.plan === "free" && (
+                <span className="shrink-0 rounded-full bg-capella px-2 py-0.5 text-xs font-medium text-background">
+                  Upgrade
+                </span>
+              )}
+            </Link>
+          )}
+          <p className="mt-1 px-2 text-xs text-muted">This device: {device}</p>
         </div>
       </aside>
       {sidebarOpen && (
@@ -381,6 +381,16 @@ export default function ChatApp() {
         </div>
 
         <div className="border-t border-border bg-background px-4 pb-4 pt-3">
+          {notice && (
+            <div className="mx-auto mb-3 flex max-w-3xl items-center justify-between gap-3 rounded-xl border border-capella/40 bg-capella/10 px-4 py-2.5 text-sm">
+              <span>{notice.text}</span>
+              {notice.upgrade && (
+                <Link href="/pricing" className="shrink-0 rounded-full bg-capella px-3 py-1 font-medium text-background">
+                  See plans
+                </Link>
+              )}
+            </div>
+          )}
           <form
             className="mx-auto max-w-3xl"
             onSubmit={(e) => {
@@ -405,7 +415,13 @@ export default function ChatApp() {
               <div className="flex items-center justify-between px-3 pb-2">
                 <button
                   type="button"
-                  onClick={() => setResearch((r) => !r)}
+                  onClick={() => {
+                    if (user && !PLANS[user.plan].research) {
+                      setNotice({ text: "Deep research with cited sources is part of Pro and Max.", upgrade: true });
+                      return;
+                    }
+                    setResearch((r) => !r);
+                  }}
                   className={`rounded-full border px-3 py-1 text-xs ${research ? "border-capella bg-capella/15 text-capella" : "border-border text-muted"}`}
                   aria-pressed={research}
                 >
@@ -413,7 +429,7 @@ export default function ChatApp() {
                 </button>
                 <button
                   type="submit"
-                  disabled={sending || !spaceId || !input.trim()}
+                  disabled={sending || !user || !input.trim()}
                   className="rounded-full bg-capella px-4 py-1.5 text-sm font-medium text-background disabled:opacity-40"
                 >
                   {sending ? "…" : "Send"}
@@ -427,35 +443,23 @@ export default function ChatApp() {
         </div>
       </main>
 
-      {linkOpen && spaceId && <LinkDialog spaceId={spaceId} onClose={() => setLinkOpen(false)} />}
+      {linkOpen && <LinkDialog onClose={() => setLinkOpen(false)} />}
     </div>
   );
 }
 
-function LinkDialog({ spaceId, onClose }: { spaceId: string; onClose: () => void }) {
+function LinkDialog({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState<string | null>(null);
-  const [joinCode, setJoinCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
 
   useEffect(() => {
-    fetch("/api/link", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spaceId }),
-    })
+    fetch("/api/link", { method: "POST" })
       .then((r) => r.json())
-      .then((d) => setCode(d.code));
-  }, [spaceId]);
-
-  const url = code ? `${window.location.origin}/chat?link=${code}` : "";
-
-  async function join() {
-    const res = await fetch(`/api/link?code=${encodeURIComponent(joinCode.trim())}`);
-    if (!res.ok) return setError("That code has expired or doesn't exist.");
-    const { spaceId: joined } = await res.json();
-    saveSpace(joined);
-    window.location.reload();
-  }
+      .then((d) => {
+        setOrigin(window.location.origin);
+        setCode(d.code);
+      });
+  }, []);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -465,29 +469,13 @@ function LinkDialog({ spaceId, onClose }: { spaceId: string; onClose: () => void
       >
         <h2 className="text-lg font-semibold">Link another device</h2>
         <p className="mt-1 text-sm text-muted">
-          On your phone, tablet, computer, or vehicle, open this link or enter the code. Both
-          devices will share every conversation live.
+          You can sign in with your email and password on any device. For a phone, tablet, or car where
+          typing is a pain, open the sign-in page there and enter this one-time code instead.
         </p>
         <div className="mt-5 rounded-xl bg-surface-2 p-4 text-center">
           <p className="font-mono text-3xl tracking-[0.3em] text-capella">{code ?? "······"}</p>
-          {code && <p className="mt-2 break-all text-xs text-muted">{url}</p>}
-          <p className="mt-2 text-xs text-muted">Expires in 10 minutes</p>
-        </div>
-        <div className="mt-6 border-t border-border pt-5">
-          <p className="text-sm">Have a code from another device?</p>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="ABC123"
-              maxLength={6}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono uppercase tracking-widest outline-none focus:border-capella"
-            />
-            <button onClick={join} className="rounded-lg bg-capella px-4 text-sm font-medium text-background">
-              Join
-            </button>
-          </div>
-          {error && <p className="mt-2 text-sm text-antares">{error}</p>}
+          {origin && <p className="mt-2 break-all text-xs text-muted">{origin}/signin</p>}
+          <p className="mt-2 text-xs text-muted">Works once, expires in 10 minutes</p>
         </div>
         <button onClick={onClose} className="mt-6 w-full rounded-lg border border-border py-2 text-sm hover:bg-surface-2">
           Done

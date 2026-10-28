@@ -1,17 +1,22 @@
-import { createLinkCode, getSpace, redeemLinkCode } from "@/lib/store";
+import { createDeviceCode, currentUser, redeemDeviceCode, startSession } from "@/lib/auth";
+import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
-// POST { spaceId } -> a short code another device can enter to join this space.
-export async function POST(request: Request) {
-  const { spaceId } = await request.json().catch(() => ({}));
-  if (!(await getSpace(spaceId))) return Response.json({ error: "Unknown space" }, { status: 404 });
-  const link = await createLinkCode(spaceId);
-  return Response.json({ code: link.code, expiresAt: link.expiresAt });
+// POST -> a short single-use code that signs another device into this account.
+export async function POST() {
+  const user = await currentUser();
+  if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
+  const { code, expiresAt } = await createDeviceCode(user.id);
+  return Response.json({ code, expiresAt });
 }
 
-// GET ?code=XXXXXX -> the space to join.
-export async function GET(request: Request) {
-  const code = new URL(request.url).searchParams.get("code") ?? "";
-  const spaceId = await redeemLinkCode(code);
-  if (!spaceId) return Response.json({ error: "Code expired or not found" }, { status: 404 });
-  return Response.json({ spaceId });
+// PUT { code } -> signs this device in.
+export async function PUT(request: Request) {
+  if (tooManyAttempts(`link:${clientIp(request)}`, 20)) {
+    return Response.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
+  }
+  const { code } = await request.json().catch(() => ({}));
+  const userId = typeof code === "string" ? await redeemDeviceCode(code) : null;
+  if (!userId) return Response.json({ error: "That code has expired or doesn't exist." }, { status: 404 });
+  await startSession(userId);
+  return Response.json({ ok: true });
 }

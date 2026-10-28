@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { StarMark, Wordmark } from "@/components/Logo";
+import { StarMark } from "@/components/Logo";
+import { SiteHeader } from "@/components/SiteHeader";
 
 const capabilities = [
   {
@@ -57,28 +58,7 @@ const syncSteps = [
 export default function Home() {
   return (
     <div className="starfield min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <Wordmark />
-          <div className="flex items-center gap-5 text-sm text-muted">
-            <a href="#capabilities" className="hidden hover:text-foreground sm:inline">
-              Capabilities
-            </a>
-            <a href="#sync" className="hidden hover:text-foreground sm:inline">
-              Sync
-            </a>
-            <a href="#shield" className="hidden hover:text-foreground sm:inline">
-              Shield
-            </a>
-            <Link
-              href="/chat"
-              className="rounded-full bg-capella px-4 py-1.5 font-medium text-background hover:brightness-110"
-            >
-              Launch Antares
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader />
 
       <main>
         <section className="relative mx-auto flex max-w-6xl flex-col items-center px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28">
@@ -100,14 +80,14 @@ export default function Home() {
               href="/chat"
               className="rounded-full bg-capella px-7 py-3 font-medium text-background hover:brightness-110"
             >
-              Start talking to Antares
+              Start free
             </Link>
-            <a
-              href="#sync"
+            <Link
+              href="/pricing"
               className="rounded-full border border-border px-7 py-3 font-medium hover:bg-surface"
             >
-              See how sync works
-            </a>
+              See plans and pricing
+            </Link>
           </div>
         </section>
 

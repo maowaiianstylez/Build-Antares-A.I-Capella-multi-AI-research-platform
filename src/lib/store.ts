@@ -31,13 +31,9 @@ type Space = {
   conversations: Record<string, Conversation>;
 };
 
-type LinkCode = { code: string; spaceId: string; expiresAt: number };
-
-const DATA_DIR = process.env.ANTARES_DATA_DIR ?? path.join(process.cwd(), ".data");
-const LINK_TTL_MS = 10 * 60 * 1000;
+export const DATA_DIR = process.env.ANTARES_DATA_DIR ?? path.join(process.cwd(), ".data");
 
 const spacePath = (id: string) => path.join(DATA_DIR, "spaces", `${id}.json`);
-const linksPath = () => path.join(DATA_DIR, "links.json");
 
 const ID_RE = /^[a-f0-9-]{36}$/;
 export const isValidId = (id: unknown): id is string =>
@@ -45,14 +41,14 @@ export const isValidId = (id: unknown): id is string =>
 
 // Serialize writes per file so concurrent stream updates can't clobber each other.
 const locks = new Map<string, Promise<unknown>>();
-function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+export function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(key) ?? Promise.resolve();
   const next = prev.then(fn, fn);
   locks.set(key, next.catch(() => undefined));
   return next;
 }
 
-async function readJson<T>(file: string): Promise<T | null> {
+export async function readJson<T>(file: string): Promise<T | null> {
   try {
     return JSON.parse(await fs.readFile(file, "utf8")) as T;
   } catch {
@@ -60,7 +56,7 @@ async function readJson<T>(file: string): Promise<T | null> {
   }
 }
 
-async function writeJson(file: string, data: unknown) {
+export async function writeJson(file: string, data: unknown) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${crypto.randomUUID()}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data));
@@ -154,26 +150,4 @@ export function updateMessage(
     s.conversations[convoId].updatedAt = Date.now();
     return msg;
   });
-}
-
-export async function createLinkCode(spaceId: string): Promise<LinkCode> {
-  return withLock("links", async () => {
-    const now = Date.now();
-    const links = ((await readJson<LinkCode[]>(linksPath())) ?? []).filter(
-      (l) => l.expiresAt > now,
-    );
-    // Unambiguous alphabet (no 0/O/1/I) so codes are easy to read aloud or type in a car.
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const code = Array.from(crypto.randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
-    const link = { code, spaceId, expiresAt: now + LINK_TTL_MS };
-    links.push(link);
-    await writeJson(linksPath(), links);
-    return link;
-  });
-}
-
-export async function redeemLinkCode(code: string): Promise<string | null> {
-  const links = (await readJson<LinkCode[]>(linksPath())) ?? [];
-  const hit = links.find((l) => l.code === code.toUpperCase() && l.expiresAt > Date.now());
-  return hit?.spaceId ?? null;
 }

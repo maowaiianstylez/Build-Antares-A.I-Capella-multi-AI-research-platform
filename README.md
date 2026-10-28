@@ -8,6 +8,9 @@ The civilian edition of Antares A.I: a website plus a chat assistant that keeps 
 - **Chat app** (`/chat`): streaming answers, Markdown and code rendering, conversation history.
 - **Deep research mode**: Antares searches the web and shows the sources it used as clickable citations.
 - **Cross-device sync**: "Link another device" shows a 6-character code / link. Every linked device shares the same conversations, and a reply that is still being written shows up live on the others. If the asking device disconnects mid-answer, the server keeps generating and saves the reply.
+- **Accounts**: email + password sign-up and sign-in (scrypt-hashed passwords, HttpOnly session cookies, attempt limits). Signing in on any device joins your conversations. A one-time 6-character code signs in a phone or car without typing a password.
+- **Plans**: Free (25 messages/day), Pro $19.99/mo (500/day + deep research), Max $49.99/mo (2,000/day + early access). Defined in `src/lib/plans.ts` and enforced on the server.
+- **Stripe payments**: Checkout for subscriptions, the Stripe customer portal for card changes and cancellation, and a signed webhook that turns plans on and off.
 - **Demo mode**: runs without an AI key so the site and sync can be tried immediately.
 
 ## Run it
@@ -18,6 +21,16 @@ cp .env.example .env.local   # add ANTHROPIC_API_KEY for live answers
 npm run dev                  # http://localhost:3000
 ```
 
+## Turning on payments (Stripe)
+
+1. Create a Stripe account and copy the **secret key** (start with test mode, `sk_test_...`) into `STRIPE_SECRET_KEY`.
+2. In Stripe, add a webhook endpoint pointing at `https://<your-site>/api/stripe/webhook` with the events `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+   For local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+3. In Stripe's Billing settings, turn on the **customer portal** so "Manage billing" works.
+4. Test with card `4242 4242 4242 4242`, any future date, any CVC.
+
+Prices are created on the fly from `src/lib/plans.ts`, so no products need to be set up in Stripe first.
+
 ## Layout
 
 | Path | What it is |
@@ -26,13 +39,18 @@ npm run dev                  # http://localhost:3000
 | `src/components/ChatApp.tsx` | Chat UI, polling sync, device-link dialog |
 | `src/app/api/chat/route.ts` | Streams replies (NDJSON) and mirrors them into storage for other devices |
 | `src/lib/antares.ts` | Antares engine: model, system prompt, web search, demo mode |
-| `src/lib/store.ts` | File-backed storage for spaces, conversations, link codes |
+| `src/lib/store.ts` | File-backed storage for conversations |
+| `src/lib/auth.ts` | Accounts, sessions, daily usage, device sign-in codes |
+| `src/lib/plans.ts` | Plan names, prices, and limits |
+| `src/lib/billing.ts`, `src/app/api/billing/*`, `src/app/api/stripe/webhook` | Stripe checkout, portal, webhook |
+| `src/app/pricing`, `src/app/account`, `src/app/signin`, `src/app/signup` | Pricing, account, and auth pages |
 
 ## Before production
 
-- Replace the file store with a real database (Postgres) and real accounts (sign-in, not a device-held space ID).
+- Replace the file store with a real database (Postgres); the file store only works on a single server.
+- Add password reset and email verification (needs an email provider), and optionally Google/Apple sign-in.
 - Replace polling with WebSockets/SSE for lower handoff latency.
-- Add rate limiting and abuse protection on `/api/chat`.
+- Move the sign-in attempt limiter to Redis once there is more than one server.
 - Voice in/out for home and vehicle use; native mobile and car apps (CarPlay / Android Auto).
 - Antares Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
 - Video creation pipeline.

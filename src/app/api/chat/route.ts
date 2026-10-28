@@ -1,23 +1,46 @@
 import { runAntares, type Mode } from "@/lib/antares";
+import { consumeMessage, currentUser } from "@/lib/auth";
+import { PLANS } from "@/lib/plans";
 import { appendMessage, getConversation, updateMessage, type Source } from "@/lib/store";
 
 const MAX_INPUT = 20_000;
 
 /**
- * POST { spaceId, conversationId, text, mode, device }
+ * POST { conversationId, text, mode, device }
  * Streams newline-delimited JSON events back to the sender, and mirrors the reply
  * into the store as it grows so the user's other devices can follow along live.
  */
 export async function POST(request: Request) {
+  const user = await currentUser();
+  if (!user) return Response.json({ error: "Please sign in." }, { status: 401 });
+  const spaceId = user.spaceId;
+  const plan = PLANS[user.plan];
+
   const body = await request.json().catch(() => null);
-  const { spaceId, conversationId, text, device } = body ?? {};
+  const { conversationId, text, device } = body ?? {};
   const mode: Mode = body?.mode === "research" ? "research" : "chat";
+
+  if (mode === "research" && !plan.research) {
+    return Response.json(
+      { error: "Deep research is part of Pro and Max. Upgrade on the pricing page.", upgrade: true },
+      { status: 402 },
+    );
+  }
 
   if (typeof text !== "string" || !text.trim() || text.length > MAX_INPUT) {
     return Response.json({ error: "Message is empty or too long" }, { status: 400 });
   }
   if (!(await getConversation(spaceId, conversationId))) {
     return Response.json({ error: "Conversation not found" }, { status: 404 });
+  }
+  if (!(await consumeMessage(user.id))) {
+    return Response.json(
+      {
+        error: `You've used all ${plan.dailyMessages} messages on the ${plan.name} plan today. Upgrade for more, or come back tomorrow.`,
+        upgrade: true,
+      },
+      { status: 429 },
+    );
   }
 
   await appendMessage(spaceId, conversationId, { role: "user", text, device });
