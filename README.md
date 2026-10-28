@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Antares A.I Capella
 
-## Getting Started
+The civilian edition of Antares A.I: a website plus a chat assistant that keeps one live conversation across every device you link (home system, phone, tablet, computer, vehicle).
 
-First, run the development server:
+## What works today (MVP)
+
+- **Website** (`/`): landing page covering capabilities, device sync, and Antares Shield.
+- **Chat app** (`/chat`): streaming answers, Markdown and code rendering, conversation history.
+- **Deep research mode**: Antares searches the web and shows the sources it used as clickable citations.
+- **Cross-device sync**: "Link another device" shows a 6-character code / link. Every linked device shares the same conversations, and a reply that is still being written shows up live on the others. If the asking device disconnects mid-answer, the server keeps generating and saves the reply.
+- **Demo mode**: runs without an AI key so the site and sync can be tried immediately.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # add ANTHROPIC_API_KEY for live answers
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Layout
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Path | What it is |
+|---|---|
+| `src/app/page.tsx` | Marketing site |
+| `src/components/ChatApp.tsx` | Chat UI, polling sync, device-link dialog |
+| `src/app/api/chat/route.ts` | Streams replies (NDJSON) and mirrors them into storage for other devices |
+| `src/lib/antares.ts` | Antares engine: model, system prompt, web search, demo mode |
+| `src/lib/store.ts` | File-backed storage for spaces, conversations, link codes |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Before production
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Replace the file store with a real database (Postgres) and real accounts (sign-in, not a device-held space ID).
+- Replace polling with WebSockets/SSE for lower handoff latency.
+- Add rate limiting and abuse protection on `/api/chat`.
+- Voice in/out for home and vehicle use; native mobile and car apps (CarPlay / Android Auto).
+- Antares Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
+- Video creation pipeline.

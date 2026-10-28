@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #05070d;
+  --surface: #0c1120;
+  --surface-2: #121a2e;
+  --border: #1f2a44;
+  --foreground: #e8ecf5;
+  --muted: #8b96b0;
+  --antares: #ff4d3d;
+  --capella: #ffc94a;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-antares: var(--antares);
+  --color-capella: var(--capella);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
+
+.starfield {
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, #fff8 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 10%, #fff6 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 40% 80%, #fff7 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 60%, #fff5 50%, transparent 51%),
+    radial-gradient(1px 1px at 10% 70%, #fff6 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 60% 45%, #fff4 50%, transparent 51%);
+  background-size: 400px 400px;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.star-glow { animation: pulse-glow 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .star-glow { animation: none; }
+}
+
+/* Chat message typography */
+.prose-antares { line-height: 1.65; overflow-wrap: anywhere; }
+.prose-antares p { margin: 0.6em 0; }
+.prose-antares h1, .prose-antares h2, .prose-antares h3 { font-weight: 600; margin: 1em 0 0.4em; }
+.prose-antares h1 { font-size: 1.3em; }
+.prose-antares h2 { font-size: 1.15em; }
+.prose-antares ul { list-style: disc; padding-left: 1.4em; margin: 0.5em 0; }
+.prose-antares ol { list-style: decimal; padding-left: 1.4em; margin: 0.5em 0; }
+.prose-antares a { color: var(--capella); text-decoration: underline; }
+.prose-antares code { font-family: var(--font-mono); font-size: 0.9em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 4px; }
+.prose-antares pre { background: #02040a; border: 1px solid var(--border); border-radius: 10px; padding: 0.9em 1em; overflow-x: auto; margin: 0.8em 0; }
+.prose-antares pre code { background: none; padding: 0; }
+.prose-antares table { border-collapse: collapse; margin: 0.8em 0; display: block; overflow-x: auto; }
+.prose-antares th, .prose-antares td { border: 1px solid var(--border); padding: 0.35em 0.7em; }
+.prose-antares blockquote { border-left: 3px solid var(--antares); padding-left: 0.9em; color: var(--muted); }

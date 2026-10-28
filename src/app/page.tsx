@@ -1,69 +1,195 @@
-import Image from "next/image";
+import Link from "next/link";
+import { StarMark, Wordmark } from "@/components/Logo";
+
+const capabilities = [
+  {
+    title: "Research with evidence",
+    body: "Antares searches the web, compares sources, and backs its answers with citations you can open and check.",
+    icon: "🔭",
+  },
+  {
+    title: "Advanced calculations",
+    body: "From quick math to multi-step engineering and financial problems, with the working shown so you can follow it.",
+    icon: "∑",
+  },
+  {
+    title: "Programming",
+    body: "Write, explain, debug, and review code in any major language. Ask for a script, get a script.",
+    icon: "</>",
+  },
+  {
+    title: "Writing and editing",
+    body: "Drafts, rewrites, emails, essays, and proofreading in your voice, at the length and tone you ask for.",
+    icon: "✎",
+  },
+  {
+    title: "Video creation",
+    body: "Turn an idea into a script, storyboard, and finished video content.",
+    icon: "▶",
+    soon: true,
+  },
+  {
+    title: "Antares Shield",
+    body: "Scans the email, social, and device accounts you approve for phishing, scams, and suspicious activity.",
+    icon: "🛡",
+    soon: true,
+  },
+];
+
+const syncSteps = [
+  {
+    place: "Home",
+    line: "“Antares, what time is my meeting?”",
+    reply: "“Your design review is at 9:30. You have 40 minutes.”",
+  },
+  {
+    place: "Phone",
+    line: "You walk out the door. The conversation is already on your phone.",
+    reply: "“Want me to text the team that you’re on the way?”",
+  },
+  {
+    place: "Vehicle",
+    line: "You start the car. Antares picks up mid-sentence.",
+    reply: "“Traffic is light. You’ll arrive at 9:12.”",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="starfield min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+          <Wordmark />
+          <div className="flex items-center gap-5 text-sm text-muted">
+            <a href="#capabilities" className="hidden hover:text-foreground sm:inline">
+              Capabilities
+            </a>
+            <a href="#sync" className="hidden hover:text-foreground sm:inline">
+              Sync
+            </a>
+            <a href="#shield" className="hidden hover:text-foreground sm:inline">
+              Shield
+            </a>
+            <Link
+              href="/chat"
+              className="rounded-full bg-capella px-4 py-1.5 font-medium text-background hover:brightness-110"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              Launch Antares
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      <main>
+        <section className="relative mx-auto flex max-w-6xl flex-col items-center px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28">
+          <div className="star-glow pointer-events-none absolute top-6 -z-0 h-72 w-72 rounded-full bg-antares/20 blur-3xl" />
+          <StarMark className="relative h-20 w-20" />
+          <p className="relative mt-6 text-sm uppercase tracking-[0.3em] text-capella">
+            Capella edition
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <h1 className="relative mt-3 max-w-3xl text-4xl font-semibold leading-tight sm:text-6xl">
+            One AI assistant that goes everywhere you go.
+          </h1>
+          <p className="relative mt-6 max-w-2xl text-lg text-muted">
+            Ask Antares anything. Get researched answers backed by evidence, solve hard problems,
+            write and code, then carry the same conversation from your home to your phone to your
+            car without missing a beat.
+          </p>
+          <div className="relative mt-10 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/chat"
+              className="rounded-full bg-capella px-7 py-3 font-medium text-background hover:brightness-110"
+            >
+              Start talking to Antares
+            </Link>
+            <a
+              href="#sync"
+              className="rounded-full border border-border px-7 py-3 font-medium hover:bg-surface"
+            >
+              See how sync works
+            </a>
+          </div>
+        </section>
+
+        <section id="capabilities" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <h2 className="text-3xl font-semibold">What Antares can do</h2>
+          <p className="mt-2 text-muted">
+            Built for everyday people, families, creators, and businesses.
+          </p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {capabilities.map((c) => (
+              <div key={c.title} className="rounded-2xl border border-border bg-surface/80 p-6">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 font-mono text-capella">
+                    {c.icon}
+                  </span>
+                  {c.soon && (
+                    <span className="rounded-full border border-antares/40 px-2.5 py-0.5 text-xs text-antares">
+                      Coming soon
+                    </span>
+                  )}
+                </div>
+                <h3 className="mt-4 text-lg font-medium">{c.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="sync" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <h2 className="text-3xl font-semibold">Your conversation follows you</h2>
+          <p className="mt-2 max-w-2xl text-muted">
+            Link your home system, phone, tablet, computer, and vehicle once. After that, every
+            device shares the same live conversation, so you never have to repeat yourself.
+          </p>
+          <ol className="mt-10 grid gap-4 md:grid-cols-3">
+            {syncSteps.map((s, i) => (
+              <li key={s.place} className="relative rounded-2xl border border-border bg-surface/80 p-6">
+                <span className="text-xs uppercase tracking-widest text-capella">
+                  {i + 1}. {s.place}
+                </span>
+                <p className="mt-3">{s.line}</p>
+                <p className="mt-3 rounded-xl bg-surface-2 p-3 text-sm text-muted">
+                  <span className="font-medium text-foreground">Antares: </span>
+                  {s.reply}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section id="shield" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <div className="rounded-3xl border border-antares/30 bg-gradient-to-br from-antares/10 to-surface p-8 sm:p-12">
+            <span className="rounded-full border border-antares/40 px-3 py-1 text-xs text-antares">
+              Coming soon
+            </span>
+            <h2 className="mt-4 text-3xl font-semibold">Antares Shield</h2>
+            <p className="mt-3 max-w-2xl text-muted">
+              Shield watches the accounts and devices you choose for phishing emails, account
+              takeovers, scam messages, and suspicious logins, then tells you in plain language what
+              it found and what to do. You approve each connection, you can revoke it at any time,
+              and Shield never sees anything you have not shared with it.
+            </p>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 pb-24 pt-8 text-center sm:px-6">
+          <h2 className="text-3xl font-semibold">Ready when you are.</h2>
+          <Link
+            href="/chat"
+            className="mt-6 inline-block rounded-full bg-capella px-7 py-3 font-medium text-background hover:brightness-110"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            Launch Antares
+          </Link>
+        </section>
       </main>
+
+      <footer className="border-t border-border/60">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between sm:px-6">
+          <span>© 2026 Antares Systems</span>
+          <span>Antares A.I Capella, for personal and commercial use.</span>
+        </div>
+      </footer>
     </div>
   );
 }
