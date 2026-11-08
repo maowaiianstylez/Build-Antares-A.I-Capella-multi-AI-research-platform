@@ -3,7 +3,7 @@ import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 // POST { token, password } -> sets the new password and signs this device in.
 export async function POST(request: Request) {
-  if (tooManyAttempts(`reset:${clientIp(request)}`, 10)) {
+  if (await tooManyAttempts(`reset:${clientIp(request)}`, 10)) {
     return Response.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
   const { token, password } = await request.json().catch(() => ({}));

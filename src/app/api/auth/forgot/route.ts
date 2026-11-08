@@ -6,7 +6,7 @@ import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 // POST { email } -> emails a reset link. Always answers the same way so it can't be used
 // to find out which emails have accounts.
 export async function POST(request: Request) {
-  if (tooManyAttempts(`forgot:${clientIp(request)}`, 5)) {
+  if (await tooManyAttempts(`forgot:${clientIp(request)}`, 5)) {
     return Response.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
   const { email } = await request.json().catch(() => ({}));

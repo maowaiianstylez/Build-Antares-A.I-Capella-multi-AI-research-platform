@@ -11,7 +11,7 @@ export async function POST() {
 
 // PUT { code } -> signs this device in.
 export async function PUT(request: Request) {
-  if (tooManyAttempts(`link:${clientIp(request)}`, 20)) {
+  if (await tooManyAttempts(`link:${clientIp(request)}`, 20)) {
     return Response.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
   const { code } = await request.json().catch(() => ({}));

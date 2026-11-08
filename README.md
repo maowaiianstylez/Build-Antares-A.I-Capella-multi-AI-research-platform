@@ -19,11 +19,28 @@ A deep research and results platform for everyday people. Antares asks every maj
 
 ## Run it
 
+You need Node 20+ and a Postgres database (local, Docker, or a free hosted one such as Neon).
+
 ```bash
 npm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY for live answers
+cp .env.example .env.local   # set DATABASE_URL; add ANTHROPIC_API_KEY for live answers
 npm run dev                  # http://localhost:3000
 ```
+
+Tables are created automatically the first time the app talks to the database.
+
+## Deploy (Railway, recommended)
+
+Railway runs the app and its Postgres database side by side, with no time limit on long Deep Dives.
+
+1. Put this code in a GitHub repository.
+2. Sign in at [railway.com](https://railway.com) with GitHub, choose **New Project → Deploy from GitHub repo**, and pick the repository. `railway.json` already sets the build, start, and health check.
+3. In the project, click **+ New → Database → PostgreSQL**.
+4. Open the app service's **Variables** and add `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`, plus your AI, Stripe, and email keys from `.env.example`.
+5. Under **Settings → Networking**, generate a public domain (or add your own), then set `APP_URL` to it.
+6. In Stripe, point the webhook at `https://<your-domain>/api/stripe/webhook`.
+
+`GET /api/health` returns `{ "ok": true }` when the app and database are up. Any other Node host with Postgres (Render, Fly.io, a VPS) works the same way: `npm run build`, then `npm start` with the variables set.
 
 ## Connecting AI providers
 
@@ -73,7 +90,8 @@ Prices are created on the fly from `src/lib/plans.ts`, so no products need to be
 | `src/app/api/chat/route.ts` | Streams replies (NDJSON) and mirrors them into storage for other devices |
 | `src/lib/antares.ts` | Antares engine: single-model chat, the Deep Dive pipeline, demo mode |
 | `src/lib/providers.ts` | Provider registry and calls for ChatGPT, Gemini, Grok, DeepSeek |
-| `src/lib/store.ts` | File-backed storage for conversations |
+| `src/lib/db.ts` | Postgres connection and schema (created automatically) |
+| `src/lib/store.ts` | Conversations and messages |
 | `src/lib/auth.ts` | Accounts, sessions, daily usage, device sign-in codes |
 | `src/lib/plans.ts` | Plan names, prices, and limits |
 | `src/lib/billing.ts`, `src/app/api/billing/*`, `src/app/api/stripe/webhook` | Stripe checkout, portal, webhook |
@@ -81,10 +99,8 @@ Prices are created on the fly from `src/lib/plans.ts`, so no products need to be
 
 ## Before production
 
-- Replace the file store with a real database (Postgres); the file store only works on a single server.
-- Add password reset and email verification (needs an email provider), and optionally Google/Apple sign-in.
+- Email verification, and optionally Google/Apple sign-in.
 - Replace polling with WebSockets/SSE for lower handoff latency.
-- Move the sign-in attempt limiter to Redis once there is more than one server.
-- Voice in/out for home and vehicle use; native mobile and car apps (CarPlay / Android Auto).
+- Native mobile and car apps (CarPlay / Android Auto).
 - Antares Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
 - Video creation pipeline.

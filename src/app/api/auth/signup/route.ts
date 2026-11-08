@@ -2,7 +2,7 @@ import { createUser, isValidEmail, normalizeEmail, startSession, toPublicUser } 
 import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
-  if (tooManyAttempts(`signup:${clientIp(request)}`)) {
+  if (await tooManyAttempts(`signup:${clientIp(request)}`)) {
     return Response.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
   const body = await request.json().catch(() => ({}));

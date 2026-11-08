@@ -1,9 +1,7 @@
-// File-backed store for the MVP. Every device that joins the same "space"
-// sees the same conversations, which is what makes the cross-device handoff
-// work. Swap this module for Postgres/Redis before production.
-import { promises as fs } from "fs";
-import path from "path";
+// Conversations and messages, stored in Postgres. Every device signed into the same account
+// reads the same rows, which is what makes the cross-device handoff work.
 import crypto from "crypto";
+import { db } from "./db";
 
 export type Source = { url: string; title: string };
 
@@ -38,129 +36,118 @@ export type Conversation = {
   messages: ChatMessage[];
 };
 
-type Space = {
+const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isValidId = (id: unknown): id is string => typeof id === "string" && ID_RE.test(id);
+
+type MessageRow = {
   id: string;
-  createdAt: number;
-  conversations: Record<string, Conversation>;
+  role: "user" | "assistant";
+  text: string;
+  sources: Source[] | null;
+  panel: PanelEntry[] | null;
+  model_name: string | null;
+  device: string | null;
+  streaming: boolean;
+  created_at: Date;
 };
 
-export const DATA_DIR = process.env.ANTARES_DATA_DIR ?? path.join(process.cwd(), ".data");
+const toMessage = (r: MessageRow): ChatMessage => ({
+  id: r.id,
+  role: r.role,
+  text: r.text,
+  sources: r.sources ?? undefined,
+  panel: r.panel ?? undefined,
+  modelName: r.model_name ?? undefined,
+  device: r.device ?? undefined,
+  streaming: r.streaming,
+  createdAt: r.created_at.getTime(),
+});
 
-const spacePath = (id: string) => path.join(DATA_DIR, "spaces", `${id}.json`);
-
-const ID_RE = /^[a-f0-9-]{36}$/;
-export const isValidId = (id: unknown): id is string =>
-  typeof id === "string" && ID_RE.test(id);
-
-// Serialize writes per file so concurrent stream updates can't clobber each other.
-const locks = new Map<string, Promise<unknown>>();
-export function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const prev = locks.get(key) ?? Promise.resolve();
-  const next = prev.then(fn, fn);
-  locks.set(key, next.catch(() => undefined));
-  return next;
+export async function listConversations(userId: string) {
+  const sql = await db();
+  const rows = await sql<{ id: string; title: string; updated_at: Date }[]>`
+    select id, title, updated_at from conversations where user_id = ${userId} order by updated_at desc limit 200`;
+  return rows.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updated_at.getTime() }));
 }
 
-export async function readJson<T>(file: string): Promise<T | null> {
-  try {
-    return JSON.parse(await fs.readFile(file, "utf8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-export async function writeJson(file: string, data: unknown) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${crypto.randomUUID()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(data));
-  await fs.rename(tmp, file);
-}
-
-export async function createSpace(): Promise<string> {
+export async function createConversation(userId: string, title = "New conversation"): Promise<Conversation> {
+  const sql = await db();
   const id = crypto.randomUUID();
-  await writeJson(spacePath(id), { id, createdAt: Date.now(), conversations: {} });
-  return id;
+  const [row] = await sql<{ created_at: Date }[]>`
+    insert into conversations (id, user_id, title) values (${id}, ${userId}, ${title}) returning created_at`;
+  const t = row.created_at.getTime();
+  return { id, title, createdAt: t, updatedAt: t, messages: [] };
 }
 
-export async function getSpace(id: string): Promise<Space | null> {
-  if (!isValidId(id)) return null;
-  return readJson<Space>(spacePath(id));
+export async function getConversation(userId: string, convoId: string): Promise<Conversation | null> {
+  if (!isValidId(convoId)) return null;
+  const sql = await db();
+  const [c] = await sql<{ id: string; title: string; created_at: Date; updated_at: Date }[]>`
+    select id, title, created_at, updated_at from conversations where id = ${convoId} and user_id = ${userId}`;
+  if (!c) return null;
+  const rows = await sql<MessageRow[]>`
+    select id, role, text, sources, panel, model_name, device, streaming, created_at
+    from messages where conversation_id = ${convoId} order by created_at`;
+  return {
+    id: c.id,
+    title: c.title,
+    createdAt: c.created_at.getTime(),
+    updatedAt: c.updated_at.getTime(),
+    messages: rows.map(toMessage),
+  };
 }
 
-function mutateSpace<T>(id: string, fn: (s: Space) => T): Promise<T | null> {
-  return withLock(id, async () => {
-    const space = await getSpace(id);
-    if (!space) return null;
-    const result = fn(space);
-    await writeJson(spacePath(id), space);
-    return result;
-  });
+export async function deleteConversation(userId: string, convoId: string) {
+  if (!isValidId(convoId)) return false;
+  const sql = await db();
+  await sql`delete from conversations where id = ${convoId} and user_id = ${userId}`;
+  return true;
 }
 
-export async function listConversations(spaceId: string) {
-  const space = await getSpace(spaceId);
-  if (!space) return null;
-  return Object.values(space.conversations)
-    .map(({ id, title, updatedAt }) => ({ id, title, updatedAt }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-export function createConversation(spaceId: string, title = "New conversation") {
-  return mutateSpace(spaceId, (s) => {
-    const now = Date.now();
-    const convo: Conversation = {
-      id: crypto.randomUUID(),
-      title,
-      createdAt: now,
-      updatedAt: now,
-      messages: [],
-    };
-    s.conversations[convo.id] = convo;
-    return convo;
-  });
-}
-
-export async function getConversation(spaceId: string, convoId: string) {
-  const space = await getSpace(spaceId);
-  return space?.conversations[convoId] ?? null;
-}
-
-export function deleteConversation(spaceId: string, convoId: string) {
-  return mutateSpace(spaceId, (s) => {
-    delete s.conversations[convoId];
-    return true;
-  });
-}
-
-export function appendMessage(
-  spaceId: string,
+export async function appendMessage(
+  userId: string,
   convoId: string,
   msg: Omit<ChatMessage, "id" | "createdAt">,
-) {
-  return mutateSpace(spaceId, (s) => {
-    const convo = s.conversations[convoId];
-    if (!convo) return null;
-    const full: ChatMessage = { ...msg, id: crypto.randomUUID(), createdAt: Date.now() };
-    convo.messages.push(full);
-    if (convo.messages.length === 1 && msg.role === "user") {
-      convo.title = msg.text.slice(0, 60) || convo.title;
+): Promise<ChatMessage | null> {
+  if (!isValidId(convoId)) return null;
+  const sql = await db();
+  return sql.begin(async (tx) => {
+    const [c] = await tx<{ id: string }[]>`
+      update conversations set updated_at = now() where id = ${convoId} and user_id = ${userId} returning id`;
+    if (!c) return null;
+    const [row] = await tx<MessageRow[]>`
+      insert into messages (id, conversation_id, role, text, sources, panel, model_name, device, streaming)
+      values (${crypto.randomUUID()}, ${convoId}, ${msg.role}, ${msg.text},
+              ${msg.sources ? tx.json(msg.sources) : null}, ${msg.panel ? tx.json(msg.panel) : null},
+              ${msg.modelName ?? null}, ${msg.device ?? null}, ${msg.streaming ?? false})
+      returning id, role, text, sources, panel, model_name, device, streaming, created_at`;
+    // Name a new conversation after its first question.
+    if (msg.role === "user") {
+      await tx`
+        update conversations set title = ${msg.text.slice(0, 60) || "New conversation"}
+        where id = ${convoId} and (select count(*) from messages where conversation_id = ${convoId}) = 1`;
     }
-    convo.updatedAt = Date.now();
-    return full;
+    return toMessage(row);
   });
 }
 
-export function updateMessage(
-  spaceId: string,
+export async function updateMessage(
+  userId: string,
   convoId: string,
   msgId: string,
   patch: Partial<Pick<ChatMessage, "text" | "sources" | "panel" | "modelName" | "streaming">>,
 ) {
-  return mutateSpace(spaceId, (s) => {
-    const msg = s.conversations[convoId]?.messages.find((m) => m.id === msgId);
-    if (!msg) return null;
-    Object.assign(msg, patch);
-    s.conversations[convoId].updatedAt = Date.now();
-    return msg;
-  });
+  const sql = await db();
+  const [row] = await sql<MessageRow[]>`
+    update messages m set
+      text = coalesce(${patch.text ?? null}, m.text),
+      sources = coalesce(${patch.sources ? sql.json(patch.sources) : null}, m.sources),
+      panel = coalesce(${patch.panel ? sql.json(patch.panel) : null}, m.panel),
+      model_name = coalesce(${patch.modelName ?? null}, m.model_name),
+      streaming = coalesce(${patch.streaming ?? null}, m.streaming)
+    from conversations c
+    where m.id = ${msgId} and m.conversation_id = ${convoId} and c.id = m.conversation_id and c.user_id = ${userId}
+    returning m.id, m.role, m.text, m.sources, m.panel, m.model_name, m.device, m.streaming, m.created_at`;
+  if (row) await sql`update conversations set updated_at = now() where id = ${convoId}`;
+  return row ? toMessage(row) : null;
 }
