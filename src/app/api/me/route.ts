@@ -10,6 +10,6 @@ export async function GET() {
     user: toPublicUser(user),
     live: hasApiKey(),
     billing: billingEnabled(),
-    providers: availableProviders().map(({ id, name, company }) => ({ id, name, company })),
+    providers: availableProviders().map(({ id, name, company, region }) => ({ id, name, company, region })),
   });
 }

@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ChatMessage, PanelEntry, Source } from "./store";
+import { routeTask, type Task } from "./router";
 import {
   allProviders,
   askCompatible,
   availableProviders,
+  panelProviders,
   providerInfo,
   streamCompatible,
   type ProviderId,
@@ -57,11 +59,19 @@ function toApiMessages(history: ChatMessage[]): ApiMessage[] {
   return history.filter((m) => m.text.trim()).map((m) => ({ role: m.role, content: m.text }));
 }
 
-/** Picks the model for a single-model chat: the user's choice if configured, otherwise Claude, otherwise anything available. */
-export function resolveModel(choice: ModelChoice): ProviderInfo | null {
+/**
+ * Picks the model for a single-model chat: the user's choice if configured, otherwise
+ * Antares Auto routes by task type (see router.ts), falling back to any connected model.
+ */
+export function resolveModel(choice: ModelChoice, text = ""): { target: ProviderInfo; task?: Task } | null {
   const available = availableProviders();
-  if (choice !== "auto") return available.find((p) => p.id === choice) ?? null;
-  return available.find((p) => p.id === "claude") ?? available[0] ?? null;
+  if (choice !== "auto") {
+    const target = available.find((p) => p.id === choice);
+    return target ? { target } : null;
+  }
+  const { task, prefer } = routeTask(text);
+  const target = prefer.map((id) => available.find((p) => p.id === id)).find(Boolean) ?? available[0];
+  return target ? { target, task } : null;
 }
 
 /**
@@ -77,8 +87,8 @@ export async function* runAntares(
     return;
   }
 
-  const target = hasApiKey() ? resolveModel(choice) : null;
-  if (!target) {
+  const routed = hasApiKey() ? resolveModel(choice, history.at(-1)?.text) : null;
+  if (!routed) {
     if (hasApiKey()) {
       yield { type: "error", message: `${providerInfo(choice as ProviderId).name} isn't connected on this server yet.` };
     } else {
@@ -87,7 +97,8 @@ export async function* runAntares(
     return;
   }
 
-  yield { type: "model", provider: target.id, name: target.name };
+  const { target, task } = routed;
+  yield { type: "model", provider: target.id, name: task ? `${target.name} · Auto picked for ${task}` : target.name };
   if (target.id === "claude") {
     yield* claudeStream({ system: SYSTEM_PROMPT, messages: toApiMessages(history), effort: "low", searches: 3 });
   } else {
@@ -138,7 +149,7 @@ Sources:
 ${sourceList || "(none)"}`;
 
   // 2. Panel: every connected model answers independently, in parallel.
-  const panel = availableProviders();
+  const panel = panelProviders();
   yield { type: "status", text: `Consulting ${panel.length} AI model${panel.length === 1 ? "" : "s"}: ${panel.map((p) => p.name).join(", ")}…` };
   const pending = new Map(
     panel.map((p) => [
@@ -281,7 +292,7 @@ async function* demoDeepDive(prompt: string): AsyncGenerator<StreamEvent> {
   yield { type: "status", text: "Gathering evidence from the web…" };
   await sleep(600);
   yield { type: "source", source: { url: "https://example.com/demo-source", title: "Example source (demo)" } };
-  const panel = allProviders();
+  const panel = allProviders().filter((p) => p.region === "US");
   yield { type: "status", text: `Consulting ${panel.length} AI models…` };
   for (const p of panel) {
     await sleep(250);

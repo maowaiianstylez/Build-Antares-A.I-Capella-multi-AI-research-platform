@@ -11,7 +11,7 @@ import { PLANS } from "@/lib/plans";
 
 type Source = { url: string; title: string };
 type PanelEntry = { provider: string; name: string; company: string; model: string; text?: string; error?: string };
-type Provider = { id: string; name: string; company: string };
+type Provider = { id: string; name: string; company: string; region: string };
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -456,7 +456,7 @@ export default function ChatApp() {
                     <option value="auto">Antares Auto</option>
                     {providers.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {p.region === "US" ? p.name : `${p.name} (data processed in ${p.region})`}
                       </option>
                     ))}
                   </select>

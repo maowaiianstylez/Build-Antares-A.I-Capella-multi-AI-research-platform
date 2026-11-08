@@ -7,7 +7,7 @@ A deep research and results platform for everyday people. Antares asks every maj
 - **Website** (`/`): landing page covering capabilities, device sync, and Antares Shield.
 - **Chat app** (`/chat`): streaming answers, Markdown and code rendering, conversation history.
 - **Deep Dive** (Pro and Max, counts as 5 messages): (1) Claude searches the web and writes a neutral evidence brief; (2) every connected model answers independently from that evidence, in parallel; (3) Claude cross-checks the panel against the sources and writes the final answer: bottom line, cited evidence, where models agree and differ, confidence. Each model's answer is shown in a collapsible panel. A model that fails or times out is skipped, not fatal.
-- **Model picker**: chat with Claude, ChatGPT, Gemini, Grok, or DeepSeek, or "Antares Auto". Only providers with a key appear.
+- **Model picker**: chat with Claude, ChatGPT, Gemini, Grok, DeepSeek, or Kimi, or "Antares Auto", which routes each message by task type. Only providers with a key appear.
 - **Cross-device sync**: "Link another device" shows a 6-character code / link. Every linked device shares the same conversations, and a reply that is still being written shows up live on the others. If the asking device disconnects mid-answer, the server keeps generating and saves the reply.
 - **Accounts**: email + password sign-up and sign-in (scrypt-hashed passwords, HttpOnly session cookies, attempt limits). Signing in on any device joins your conversations. A one-time 6-character code signs in a phone or car without typing a password.
 - **Plans**: Free (25 messages/day), Pro $19.99/mo (500/day + deep research), Max $49.99/mo (2,000/day + early access). Defined in `src/lib/plans.ts` and enforced on the server.
@@ -32,7 +32,22 @@ Add any of these keys; each provider is optional and is used only when its key i
 | ChatGPT (OpenAI) | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-5.6-sol` |
 | Gemini (Google) | `GEMINI_API_KEY` | `GEMINI_MODEL` | `gemini-3.1-pro-preview` |
 | Grok (xAI) | `XAI_API_KEY` | `XAI_MODEL` | `grok-4.5` |
-| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `deepseek-v4-pro` |
+| DeepSeek (optional, data processed in China) | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `deepseek-v4-pro` |
+| Kimi (Moonshot AI, optional, data processed in China) | `KIMI_API_KEY` | `KIMI_MODEL` | `kimi-k3.1-pro` |
+
+**Deep Dive panel:** by default the core four (Claude, ChatGPT, Gemini, Grok) that have keys. DeepSeek and Kimi join only when listed in `DEEP_DIVE_PANEL`, e.g. `claude,openai,gemini,grok,deepseek,kimi`. They can always be picked by hand in chat, labeled with where data is processed.
+
+**Antares Auto routing** (`src/lib/router.ts`): first matching rule wins, skipping providers without a key, and Auto only routes to the core four.
+
+| Task | Detected by | Goes to |
+|---|---|---|
+| Long document | message over 30,000 characters | Gemini, then Claude |
+| Current events | words like today, latest, news, price of, score | Claude (it has live web search) |
+| Coding | code blocks, language names, bug, error | Claude, then ChatGPT |
+| Math and money | calculate, solve, percent, loan, arithmetic | ChatGPT, then Claude |
+| Writing | write, rewrite, edit, email, summarize | Claude, then ChatGPT |
+| Humor | joke, roast, meme | Grok, then Claude |
+| Everything else | | Claude, ChatGPT, Gemini, Grok |
 
 Providers rename models often. Check each provider's model list when you add a key and set the `*_MODEL` variable if the default has changed. ChatGPT, Gemini, Grok and DeepSeek are called through their OpenAI-compatible endpoints (`src/lib/providers.ts`).
 
