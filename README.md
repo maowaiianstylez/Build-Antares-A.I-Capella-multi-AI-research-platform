@@ -12,6 +12,9 @@ A deep research and results platform for everyday people. Antares asks every maj
 - **Accounts**: email + password sign-up and sign-in (scrypt-hashed passwords, HttpOnly session cookies, attempt limits). Signing in on any device joins your conversations. A one-time 6-character code signs in a phone or car without typing a password.
 - **Plans**: Free (25 messages/day), Pro $19.99/mo (500/day + deep research), Max $49.99/mo (2,000/day + early access). Defined in `src/lib/plans.ts` and enforced on the server.
 - **Stripe payments**: Checkout for subscriptions, the Stripe customer portal for card changes and cancellation, and a signed webhook that turns plans on and off.
+- **Voice**: tap the mic to ask out loud, "Read aloud" speaks answers, and "Hands-free" loops listen → answer → speak → listen for home and car use. Uses the browser's built-in speech engines (Chrome, Edge, Safari), so no extra service or key.
+- **Installable app**: a web app manifest and icons let people install Antares on phones, tablets, computers and car screens ("Install the Antares app" in the chat sidebar, or Add to Home Screen on iPhone).
+- **Password reset**: "Forgot password?" emails a one-hour, single-use link through Resend (`RESEND_API_KEY`, `EMAIL_FROM`). Resetting signs the account out everywhere. Without email keys the link is printed to the server log.
 - **Demo mode**: runs without an AI key so the site and sync can be tried immediately.
 
 ## Run it

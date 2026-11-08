@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "Antares A.I Capella",
   description:
     "Antares A.I Capella asks every major AI your question, cross-checks them against real sources, and gives you one answer you can trust.",
+  applicationName: "Antares",
+  appleWebApp: { capable: true, title: "Antares", statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

@@ -39,6 +39,10 @@ type DeviceCode = { code: string; userId: string; expiresAt: number };
 const usersFile = path.join(DATA_DIR, "users.json");
 const sessionsFile = path.join(DATA_DIR, "sessions.json");
 const codesFile = path.join(DATA_DIR, "device-codes.json");
+const resetsFile = path.join(DATA_DIR, "password-resets.json");
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+type PasswordReset = { tokenHash: string; userId: string; expiresAt: number };
 
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -206,4 +210,43 @@ export async function redeemDeviceCode(code: string) {
     await writeJson(codesFile, codes.filter((c) => c !== hit));
     return hit?.userId ?? null;
   });
+}
+
+// ---- Password reset ----
+
+export async function findUserByEmail(email: string) {
+  return Object.values(await loadUsers()).find((u) => u.email === email) ?? null;
+}
+
+/** Creates a single-use reset token (valid one hour). Only its hash is stored. */
+export async function createPasswordReset(userId: string) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  await withLock("resets", async () => {
+    const now = Date.now();
+    const resets = ((await readJson<PasswordReset[]>(resetsFile)) ?? []).filter(
+      (r) => r.expiresAt > now && r.userId !== userId,
+    );
+    resets.push({ tokenHash: sha256(token), userId, expiresAt: now + RESET_TTL_MS });
+    await writeJson(resetsFile, resets);
+  });
+  return token;
+}
+
+/** Sets a new password, signs the account out everywhere, and returns the user id. */
+export async function resetPassword(token: string, password: string) {
+  const hash = sha256(token);
+  const userId = await withLock("resets", async () => {
+    const now = Date.now();
+    const resets = ((await readJson<PasswordReset[]>(resetsFile)) ?? []).filter((r) => r.expiresAt > now);
+    const hit = resets.find((r) => r.tokenHash === hash);
+    await writeJson(resetsFile, resets.filter((r) => r !== hit));
+    return hit?.userId ?? null;
+  });
+  if (!userId) return null;
+  await updateUser(userId, { passwordHash: await hashPassword(password) });
+  await withLock("sessions", async () => {
+    const sessions = (await readJson<Session[]>(sessionsFile)) ?? [];
+    await writeJson(sessionsFile, sessions.filter((s) => s.userId !== userId));
+  });
+  return userId;
 }

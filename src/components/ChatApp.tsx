@@ -6,6 +6,8 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { StarMark } from "@/components/Logo";
+import { useVoice } from "@/components/useVoice";
+import InstallButton from "@/components/InstallButton";
 import type { PublicUser } from "@/lib/auth";
 import { PLANS } from "@/lib/plans";
 
@@ -51,6 +53,14 @@ export default function ChatApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [device, setDevice] = useState("Computer");
+  const [readAloud, setReadAloud] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const handsFreeRef = useRef(false);
+  useEffect(() => {
+    handsFreeRef.current = handsFree;
+  }, [handsFree]);
+  const sendRef = useRef<(text?: string) => void>(() => {});
+  const voice = useVoice({ onFinalTranscript: (t) => sendRef.current(t) });
   const bottomRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
 
@@ -128,8 +138,8 @@ export default function ChatApp() {
     refreshConvos();
   }
 
-  async function send() {
-    const text = input.trim();
+  async function send(spoken?: string) {
+    const text = (spoken ?? input).trim();
     if (!text || sending || !user) return;
     const convoId = activeId ?? (await newConversation());
     if (!convoId) return;
@@ -147,6 +157,8 @@ export default function ChatApp() {
       { id: pendingId, role: "assistant", text: "", sources: [], streaming: true },
     ]);
 
+    let replyText = "";
+    let finished = false;
     const patchReply = (fn: (m: Message) => Message) =>
       setMessages((all) => all.map((m) => (m.id === pendingId ? fn(m) : m)));
 
@@ -185,6 +197,7 @@ export default function ChatApp() {
           const ev = JSON.parse(line);
           if (ev.type === "text") {
             setStatus(null);
+            replyText += ev.text;
             patchReply((m) => ({ ...m, text: m.text + ev.text }));
           } else if (ev.type === "status") {
             setStatus(ev.text);
@@ -199,6 +212,7 @@ export default function ChatApp() {
           }
         }
       }
+      finished = true;
     } catch {
       patchReply((m) => ({ ...m, text: m.text || "_Couldn't reach Antares. Please try again._" }));
     } finally {
@@ -208,8 +222,15 @@ export default function ChatApp() {
       sendingRef.current = false;
       refreshConvos();
       loadMe();
+      // Hands-free: read the answer out, then listen for the next question.
+      if (finished && replyText && (readAloud || handsFree)) {
+        voice.speak(replyText, () => {
+          if (handsFreeRef.current) voice.listen();
+        });
+      }
     }
   }
+  sendRef.current = send;
 
   const otherDeviceStreaming = !sending && messages.some((m) => m.streaming);
 
@@ -268,6 +289,7 @@ export default function ChatApp() {
           >
             🔗 Link another device
           </button>
+          <InstallButton className="mt-2" />
           {user && (
             <Link
               href="/account"
@@ -302,11 +324,42 @@ export default function ChatApp() {
           <span className="truncate text-sm text-muted">
             {convos.find((c) => c.id === activeId)?.title ?? "Antares A.I Capella"}
           </span>
-          {!live && (
-            <span className="ml-auto shrink-0 rounded-full border border-capella/40 px-2 py-0.5 text-xs text-capella">
-              Demo mode
-            </span>
-          )}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {!live && (
+              <span className="rounded-full border border-capella/40 px-2 py-0.5 text-xs text-capella">Demo mode</span>
+            )}
+            {voice.supported.speak && (
+              <button
+                onClick={() => {
+                  if (readAloud) voice.stopSpeaking();
+                  setReadAloud((r) => !r);
+                }}
+                aria-pressed={readAloud}
+                title="Read answers aloud"
+                className={`rounded-full border px-2.5 py-0.5 text-xs ${readAloud ? "border-capella text-capella" : "border-border text-muted"}`}
+              >
+                🔊<span className="hidden sm:inline"> Read aloud</span>
+              </button>
+            )}
+            {voice.supported.listen && voice.supported.speak && (
+              <button
+                onClick={() => {
+                  const next = !handsFree;
+                  setHandsFree(next);
+                  if (next) voice.listen();
+                  else {
+                    voice.stopListening();
+                    voice.stopSpeaking();
+                  }
+                }}
+                aria-pressed={handsFree}
+                title="Talk back and forth without touching the screen"
+                className={`rounded-full border px-2.5 py-0.5 text-xs ${handsFree ? "border-antares bg-antares/15 text-antares" : "border-border text-muted"}`}
+              >
+                🎙<span className="hidden sm:inline"> Hands-free</span>
+              </button>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -362,6 +415,14 @@ export default function ChatApp() {
                         {m.text}
                       </ReactMarkdown>
                     </div>
+                    {!m.streaming && m.text && voice.supported.speak && (
+                      <button
+                        onClick={() => (voice.speaking ? voice.stopSpeaking() : voice.speak(m.text))}
+                        className="mt-1 text-xs text-muted hover:text-capella"
+                      >
+                        {voice.speaking ? "■ Stop" : "🔊 Listen"}
+                      </button>
+                    )}
                     {m.streaming && !m.text && (
                       <p className="animate-pulse text-sm text-muted">{status ?? "Antares is answering…"}</p>
                     )}
@@ -418,7 +479,7 @@ export default function ChatApp() {
           >
             <div className="rounded-2xl border border-border bg-surface focus-within:border-capella/60">
               <textarea
-                value={input}
+                value={voice.listening ? voice.interim : input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -427,7 +488,9 @@ export default function ChatApp() {
                   }
                 }}
                 rows={1}
-                placeholder={research ? "What should Antares research?" : "Ask Antares anything…"}
+                placeholder={
+                  voice.listening ? "Listening…" : research ? "What should Antares research?" : "Ask Antares anything…"
+                }
                 className="max-h-48 w-full resize-none bg-transparent px-4 pt-3 outline-none placeholder:text-muted"
               />
               <div className="flex items-center justify-between gap-2 px-3 pb-2">
@@ -462,6 +525,19 @@ export default function ChatApp() {
                   </select>
                 )}
                 </div>
+                <div className="flex shrink-0 items-center gap-2">
+                {voice.supported.listen && (
+                  <button
+                    type="button"
+                    onClick={() => (voice.listening ? voice.stopListening() : voice.listen())}
+                    aria-label={voice.listening ? "Stop listening" : "Speak your question"}
+                    aria-pressed={voice.listening}
+                    disabled={sending}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full border text-sm disabled:opacity-40 ${voice.listening ? "animate-pulse border-antares bg-antares/20" : "border-border hover:border-capella"}`}
+                  >
+                    🎤
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={sending || !user || !input.trim()}
@@ -469,6 +545,7 @@ export default function ChatApp() {
                 >
                   {sending ? "…" : "Send"}
                 </button>
+                </div>
               </div>
             </div>
             <p className="mt-2 text-center text-xs text-muted">

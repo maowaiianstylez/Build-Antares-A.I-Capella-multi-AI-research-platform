@@ -81,6 +81,13 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
           autoComplete={signup ? "new-password" : "current-password"}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 outline-none focus:border-capella"
         />
+        {!signup && (
+          <p className="text-right text-xs">
+            <Link href="/forgot" className="text-muted hover:text-capella">
+              Forgot password?
+            </Link>
+          </p>
+        )}
         {error && <p className="text-sm text-antares">{error}</p>}
         <button
           disabled={busy}
