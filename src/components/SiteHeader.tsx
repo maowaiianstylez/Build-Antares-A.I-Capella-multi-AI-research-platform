@@ -9,8 +9,8 @@ export function SiteHeader() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-4 text-sm text-muted sm:gap-5">
-          <Link href="/#capabilities" className="hidden hover:text-foreground md:inline">
-            Capabilities
+          <Link href="/#deep-dive" className="hidden hover:text-foreground md:inline">
+            Deep Dive
           </Link>
           <Link href="/#sync" className="hidden hover:text-foreground md:inline">
             Sync

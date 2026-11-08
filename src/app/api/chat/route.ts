@@ -1,12 +1,13 @@
-import { runAntares, type Mode } from "@/lib/antares";
+import { runAntares, type Mode, type ModelChoice } from "@/lib/antares";
+import { isProviderId } from "@/lib/providers";
 import { consumeMessage, currentUser } from "@/lib/auth";
-import { PLANS } from "@/lib/plans";
-import { appendMessage, getConversation, updateMessage, type Source } from "@/lib/store";
+import { DEEP_DIVE_COST, PLANS } from "@/lib/plans";
+import { appendMessage, getConversation, updateMessage, type PanelEntry, type Source } from "@/lib/store";
 
 const MAX_INPUT = 20_000;
 
 /**
- * POST { conversationId, text, mode, device }
+ * POST { conversationId, text, mode, model, device }
  * Streams newline-delimited JSON events back to the sender, and mirrors the reply
  * into the store as it grows so the user's other devices can follow along live.
  */
@@ -19,10 +20,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const { conversationId, text, device } = body ?? {};
   const mode: Mode = body?.mode === "research" ? "research" : "chat";
+  const choice: ModelChoice = isProviderId(body?.model) ? body.model : "auto";
 
   if (mode === "research" && !plan.research) {
     return Response.json(
-      { error: "Deep research is part of Pro and Max. Upgrade on the pricing page.", upgrade: true },
+      { error: "Deep Dive is part of Pro and Max. Upgrade on the pricing page.", upgrade: true },
       { status: 402 },
     );
   }
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
   if (!(await getConversation(spaceId, conversationId))) {
     return Response.json({ error: "Conversation not found" }, { status: 404 });
   }
-  if (!(await consumeMessage(user.id))) {
+  if (!(await consumeMessage(user.id, mode === "research" ? DEEP_DIVE_COST : 1))) {
     return Response.json(
       {
         error: `You've used all ${plan.dailyMessages} messages on the ${plan.name} plan today. Upgrade for more, or come back tomorrow.`,
@@ -71,15 +73,19 @@ export async function POST(request: Request) {
       };
       let full = "";
       const sources: Source[] = [];
+      const panel: PanelEntry[] = [];
+      let modelName: string | undefined;
       let lastSync = 0;
       const sync = (streaming: boolean) =>
-        updateMessage(spaceId, conversationId, reply.id, { text: full, sources, streaming });
+        updateMessage(spaceId, conversationId, reply.id, { text: full, sources, panel, modelName, streaming });
 
       send({ type: "start", messageId: reply.id });
       try {
-        for await (const ev of runAntares(history, mode)) {
+        for await (const ev of runAntares(history, mode, choice)) {
           if (ev.type === "text") full += ev.text;
           if (ev.type === "source") sources.push(ev.source);
+          if (ev.type === "panel") panel.push(ev.entry);
+          if (ev.type === "model") modelName = ev.name;
           if (ev.type === "error") full += `\n\n_${ev.message}_`;
           send(ev);
           if (Date.now() - lastSync > 400) {

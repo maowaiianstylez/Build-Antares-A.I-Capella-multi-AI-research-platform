@@ -7,11 +7,24 @@ import crypto from "crypto";
 
 export type Source = { url: string; title: string };
 
+/** One model's independent answer in a Deep Dive. */
+export type PanelEntry = {
+  provider: string;
+  name: string;
+  company: string;
+  model: string;
+  text?: string;
+  error?: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   sources?: Source[];
+  panel?: PanelEntry[];
+  /** Which model wrote this reply, e.g. "Gemini" or "Antares Deep Dive". */
+  modelName?: string;
   device?: string;
   streaming?: boolean;
   createdAt: number;
@@ -141,7 +154,7 @@ export function updateMessage(
   spaceId: string,
   convoId: string,
   msgId: string,
-  patch: Partial<Pick<ChatMessage, "text" | "sources" | "streaming">>,
+  patch: Partial<Pick<ChatMessage, "text" | "sources" | "panel" | "modelName" | "streaming">>,
 ) {
   return mutateSpace(spaceId, (s) => {
     const msg = s.conversations[convoId]?.messages.find((m) => m.id === msgId);

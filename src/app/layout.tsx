@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Antares A.I Capella",
   description:
-    "Antares A.I Capella is your personal AI assistant for research, problem solving, code and writing, synced across your home, phone, computer and vehicle.",
+    "Antares A.I Capella asks every major AI your question, cross-checks them against real sources, and gives you one answer you can trust.",
 };
 
 export const viewport: Viewport = {

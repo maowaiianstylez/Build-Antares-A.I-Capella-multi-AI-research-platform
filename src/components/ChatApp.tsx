@@ -10,11 +10,15 @@ import type { PublicUser } from "@/lib/auth";
 import { PLANS } from "@/lib/plans";
 
 type Source = { url: string; title: string };
+type PanelEntry = { provider: string; name: string; company: string; model: string; text?: string; error?: string };
+type Provider = { id: string; name: string; company: string };
 type Message = {
   id: string;
   role: "user" | "assistant";
   text: string;
   sources?: Source[];
+  panel?: PanelEntry[];
+  modelName?: string;
   device?: string;
   streaming?: boolean;
 };
@@ -40,6 +44,8 @@ export default function ChatApp() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [research, setResearch] = useState(false);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [model, setModel] = useState("auto");
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -57,6 +63,7 @@ export default function ChatApp() {
     const data = await res.json();
     setUser(data.user);
     setLive(data.live);
+    setProviders(data.providers ?? []);
   }, [router]);
 
   // Every device signed into the same account shares one conversation space.
@@ -131,7 +138,7 @@ export default function ChatApp() {
     setNotice(null);
     setSending(true);
     sendingRef.current = true;
-    setStatus(research ? "Researching…" : "Thinking…");
+    setStatus(research ? "Starting Deep Dive…" : "Thinking…");
     const pendingId = `pending-${Date.now()}`;
     const userMsgId = `u-${Date.now()}`;
     setMessages((m) => [
@@ -151,6 +158,7 @@ export default function ChatApp() {
           conversationId: convoId,
           text,
           mode: research ? "research" : "chat",
+          model,
           device,
         }),
       });
@@ -182,6 +190,10 @@ export default function ChatApp() {
             setStatus(ev.text);
           } else if (ev.type === "source") {
             patchReply((m) => ({ ...m, sources: [...(m.sources ?? []), ev.source] }));
+          } else if (ev.type === "panel") {
+            patchReply((m) => ({ ...m, panel: [...(m.panel ?? []), ev.entry] }));
+          } else if (ev.type === "model") {
+            patchReply((m) => ({ ...m, modelName: ev.name }));
           } else if (ev.type === "error") {
             patchReply((m) => ({ ...m, text: `${m.text}\n\n_${ev.message}_` }));
           }
@@ -302,13 +314,17 @@ export default function ChatApp() {
             {messages.length === 0 && (
               <div className="mt-16 text-center">
                 <StarMark className="mx-auto h-14 w-14" />
-                <h1 className="mt-4 text-2xl font-semibold">How can Antares help?</h1>
+                <h1 className="mt-4 text-2xl font-semibold">What do you want to get to the bottom of?</h1>
+                <p className="mt-2 text-sm text-muted">
+                  Turn on Deep Dive and Antares asks every connected AI, checks them against real sources, and
+                  gives you one answer you can trust.
+                </p>
                 <div className="mx-auto mt-8 grid max-w-xl gap-2 sm:grid-cols-2">
                   {[
-                    "What's the evidence that intermittent fasting works?",
-                    "Calculate the monthly payment on a $350k loan at 6.5% over 30 years",
+                    "Is intermittent fasting better than calorie counting for weight loss?",
+                    "Should I pay off my 6.5% mortgage early or invest the money?",
+                    "Which home EV charger is worth buying in 2026?",
                     "Write a Python script that renames photos by date taken",
-                    "Edit this paragraph to sound more confident",
                   ].map((s) => (
                     <button
                       key={s}
@@ -336,6 +352,8 @@ export default function ChatApp() {
                 <div key={m.id} className="my-5 flex gap-3">
                   <StarMark className="mt-1 h-6 w-6 shrink-0" />
                   <div className="min-w-0 flex-1">
+                    {m.modelName && <p className="mb-1 text-xs font-medium text-capella">{m.modelName}</p>}
+                    {!!m.panel?.length && <PanelView panel={m.panel} streaming={!!m.streaming && !m.text} />}
                     <div className="prose-antares">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
@@ -409,15 +427,16 @@ export default function ChatApp() {
                   }
                 }}
                 rows={1}
-                placeholder="Ask Antares anything…"
+                placeholder={research ? "What should Antares research?" : "Ask Antares anything…"}
                 className="max-h-48 w-full resize-none bg-transparent px-4 pt-3 outline-none placeholder:text-muted"
               />
-              <div className="flex items-center justify-between px-3 pb-2">
+              <div className="flex items-center justify-between gap-2 px-3 pb-2">
+                <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     if (user && !PLANS[user.plan].research) {
-                      setNotice({ text: "Deep research with cited sources is part of Pro and Max.", upgrade: true });
+                      setNotice({ text: "Deep Dive cross-checks every AI model against cited sources. It's part of Pro and Max.", upgrade: true });
                       return;
                     }
                     setResearch((r) => !r);
@@ -425,8 +444,24 @@ export default function ChatApp() {
                   className={`rounded-full border px-3 py-1 text-xs ${research ? "border-capella bg-capella/15 text-capella" : "border-border text-muted"}`}
                   aria-pressed={research}
                 >
-                  🔭 Deep research {research ? "on" : "off"}
+                  🔭 Deep Dive {research ? "on" : "off"}
                 </button>
+                {!research && providers.length > 1 && (
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    aria-label="AI model"
+                    className="min-w-0 rounded-full border border-border bg-surface px-2 py-1 text-xs text-muted outline-none"
+                  >
+                    <option value="auto">Antares Auto</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                </div>
                 <button
                   type="submit"
                   disabled={sending || !user || !input.trim()}
@@ -445,6 +480,34 @@ export default function ChatApp() {
 
       {linkOpen && <LinkDialog onClose={() => setLinkOpen(false)} />}
     </div>
+  );
+}
+
+function PanelView({ panel, streaming }: { panel: PanelEntry[]; streaming: boolean }) {
+  const answered = panel.filter((p) => p.text);
+  return (
+    <details className="mb-3 rounded-xl border border-border bg-surface/60" open={streaming}>
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted">
+        <span className="font-medium text-foreground">Compared {answered.length} AI model{answered.length === 1 ? "" : "s"}</span>
+        <span className="ml-2">{panel.map((p) => `${p.error ? "✕" : "✓"} ${p.name}`).join("  ")}</span>
+      </summary>
+      <div className="space-y-3 border-t border-border px-3 py-3">
+        {panel.map((p) => (
+          <div key={p.provider}>
+            <p className="text-xs font-medium">
+              {p.name} <span className="font-normal text-muted">· {p.company} · {p.model}</span>
+            </p>
+            {p.error ? (
+              <p className="mt-1 text-xs text-antares">Didn&apos;t answer: {p.error}</p>
+            ) : (
+              <div className="prose-antares mt-1 text-sm text-muted">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.text ?? ""}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

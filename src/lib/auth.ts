@@ -128,14 +128,14 @@ export function toPublicUser(u: User): PublicUser {
   };
 }
 
-/** Counts one message against the user's daily plan limit. Returns false when they're out. */
-export function consumeMessage(userId: string) {
+/** Counts `cost` messages against the user's daily plan limit. Returns false when they're out. */
+export function consumeMessage(userId: string, cost = 1) {
   return mutateUsers((users) => {
     const u = users[userId];
     if (!u) return false;
     if (u.usage.day !== today()) u.usage = { day: today(), count: 0 };
-    if (u.usage.count >= PLANS[u.plan].dailyMessages) return false;
-    u.usage.count += 1;
+    if (u.usage.count + cost > PLANS[u.plan].dailyMessages) return false;
+    u.usage.count += cost;
     return true;
   });
 }

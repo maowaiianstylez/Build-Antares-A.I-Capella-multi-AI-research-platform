@@ -4,24 +4,24 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 const capabilities = [
   {
-    title: "Research with evidence",
-    body: "Antares searches the web, compares sources, and backs its answers with citations you can open and check.",
+    title: "Multi-AI Deep Dive",
+    body: "One question goes to every major AI at once. Antares checks their answers against real sources and each other, then gives you one result you can trust.",
     icon: "🔭",
   },
   {
-    title: "Advanced calculations",
-    body: "From quick math to multi-step engineering and financial problems, with the working shown so you can follow it.",
+    title: "Every major AI in one app",
+    body: "Chat with Claude, ChatGPT, Gemini, Grok, or DeepSeek, or let Antares pick. One subscription, one history.",
+    icon: "✦",
+  },
+  {
+    title: "Answers backed by evidence",
+    body: "Every Deep Dive shows its sources, where the models agree, where they don't, and how confident you can be.",
+    icon: "✓",
+  },
+  {
+    title: "Calculations, code, and writing",
+    body: "Work through money, math, and engineering problems with the steps shown, write and debug code, and polish anything you write.",
     icon: "∑",
-  },
-  {
-    title: "Programming",
-    body: "Write, explain, debug, and review code in any major language. Ask for a script, get a script.",
-    icon: "</>",
-  },
-  {
-    title: "Writing and editing",
-    body: "Drafts, rewrites, emails, essays, and proofreading in your voice, at the length and tone you ask for.",
-    icon: "✎",
   },
   {
     title: "Video creation",
@@ -65,15 +65,15 @@ export default function Home() {
           <div className="star-glow pointer-events-none absolute top-6 -z-0 h-72 w-72 rounded-full bg-antares/20 blur-3xl" />
           <StarMark className="relative h-20 w-20" />
           <p className="relative mt-6 text-sm uppercase tracking-[0.3em] text-capella">
-            Capella edition
+            Antares A.I Capella
           </p>
           <h1 className="relative mt-3 max-w-3xl text-4xl font-semibold leading-tight sm:text-6xl">
-            One AI assistant that goes everywhere you go.
+            Every major AI. One answer you can trust.
           </h1>
           <p className="relative mt-6 max-w-2xl text-lg text-muted">
-            Ask Antares anything. Get researched answers backed by evidence, solve hard problems,
-            write and code, then carry the same conversation from your home to your phone to your
-            car without missing a beat.
+            Antares researches your question across the web, asks Claude, ChatGPT, Gemini, Grok, and
+            DeepSeek, cross-checks what they say, and gives you a clear, sourced result. On your phone,
+            your computer, or in your car.
           </p>
           <div className="relative mt-10 flex flex-wrap justify-center gap-3">
             <Link
@@ -91,10 +91,40 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="deep-dive" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <h2 className="text-3xl font-semibold">How a Deep Dive works</h2>
+          <p className="mt-2 max-w-2xl text-muted">
+            No single AI is right every time. Antares makes them check each other.
+          </p>
+          <ol className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              ["Gather the evidence", "Antares searches the web for primary and trusted sources, including ones that disagree."],
+              ["Ask the panel", "Every connected AI model answers your question on its own, using the same evidence."],
+              ["Cross-check and answer", "Antares compares the answers with the sources and each other, then shows the result, the agreements, the disagreements, and its confidence."],
+            ].map(([title, body], i) => (
+              <li key={title} className="rounded-2xl border border-border bg-surface/80 p-6">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-capella font-semibold text-background">
+                  {i + 1}
+                </span>
+                <h3 className="mt-4 text-lg font-medium">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-8 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span>Consults:</span>
+            {["Claude", "ChatGPT", "Gemini", "Grok", "DeepSeek"].map((n) => (
+              <span key={n} className="rounded-full border border-border bg-surface px-3 py-1 text-foreground">
+                {n}
+              </span>
+            ))}
+          </div>
+        </section>
+
         <section id="capabilities" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <h2 className="text-3xl font-semibold">What Antares can do</h2>
           <p className="mt-2 text-muted">
-            Built for everyday people, families, creators, and businesses.
+            Deep research for everyday people, not just analysts and engineers.
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {capabilities.map((c) => (
