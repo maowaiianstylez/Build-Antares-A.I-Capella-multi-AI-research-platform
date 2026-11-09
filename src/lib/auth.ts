@@ -47,13 +47,20 @@ type UserRow = {
   created_at: Date;
 };
 
+/** Emails in OWNER_EMAILS (comma-separated) always get the Max plan, so the owner can test every feature for free. */
+const ownerEmails = () =>
+  new Set((process.env.OWNER_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+
+const planFor = (r: UserRow): PlanId =>
+  ownerEmails().has(r.email.toLowerCase()) ? "max" : isPlanId(r.plan) ? r.plan : "free";
+
 const toUser = (r: UserRow): User => ({
   id: r.id,
   email: r.email,
   name: r.name,
   passwordHash: r.password_hash,
   spaceId: r.id,
-  plan: isPlanId(r.plan) ? r.plan : "free",
+  plan: planFor(r),
   stripeCustomerId: r.stripe_customer_id ?? undefined,
   stripeSubscriptionId: r.stripe_subscription_id ?? undefined,
   subscriptionStatus: r.subscription_status ?? undefined,

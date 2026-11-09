@@ -81,6 +81,8 @@ Providers rename models often. Check each provider's model list when you add a k
 
 Prices are created on the fly from `src/lib/plans.ts`, so no products need to be set up in Stripe first.
 
+To use every feature yourself without paying, set `OWNER_EMAILS` to your account's email (comma-separate several). Those accounts are always treated as Max. Sign up with that email before setting it, since emails aren't verified yet.
+
 ## Layout
 
 | Path | What it is |
