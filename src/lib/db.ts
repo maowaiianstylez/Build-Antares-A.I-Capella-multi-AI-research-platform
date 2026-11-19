@@ -19,6 +19,8 @@ create table if not exists users (
   usage_count integer not null default 0,
   created_at timestamptz not null default now()
 );
+-- Added after launch, so existing databases pick it up too.
+alter table users add column if not exists suspended_at timestamptz;
 
 create table if not exists sessions (
   token_hash text primary key,

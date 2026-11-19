@@ -1,4 +1,4 @@
-import { authenticate, normalizeEmail, startSession, toPublicUser } from "@/lib/auth";
+import { authenticate, normalizeEmail, startSession, suspendedResponse, toPublicUser } from "@/lib/auth";
 import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
@@ -9,6 +9,10 @@ export async function POST(request: Request) {
   }
   const user = await authenticate(email, String(body.password ?? ""));
   if (!user) return Response.json({ error: "Wrong email or password." }, { status: 401 });
-  await startSession(user.id);
+  try {
+    await startSession(user.id);
+  } catch (err) {
+    return suspendedResponse(err);
+  }
   return Response.json({ user: toPublicUser(user) });
 }

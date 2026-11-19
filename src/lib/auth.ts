@@ -25,9 +25,13 @@ export type User = {
   subscriptionStatus?: string;
   usage: { day: string; count: number };
   createdAt: number;
+  /** Set when an admin has suspended the account. Suspended accounts can't sign in. */
+  suspendedAt?: number;
+  /** Listed in ADMIN_EMAILS or OWNER_EMAILS: can open the admin dashboard. */
+  isAdmin: boolean;
 };
 
-export type PublicUser = Pick<User, "id" | "email" | "name" | "plan" | "subscriptionStatus"> & {
+export type PublicUser = Pick<User, "id" | "email" | "name" | "plan" | "subscriptionStatus" | "isAdmin"> & {
   usedToday: number;
   dailyLimit: number;
   hasBilling: boolean;
@@ -45,11 +49,21 @@ type UserRow = {
   usage_day: string;
   usage_count: number;
   created_at: Date;
+  suspended_at: Date | null;
 };
 
+const emailList = (value: string | undefined) =>
+  new Set((value ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+
 /** Emails in OWNER_EMAILS (comma-separated) always get the Max plan, so the owner can test every feature for free. */
-const ownerEmails = () =>
-  new Set((process.env.OWNER_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+const ownerEmails = () => emailList(process.env.OWNER_EMAILS);
+export const isOwnerEmail = (email: string) => ownerEmails().has(email.toLowerCase());
+
+/** Emails in ADMIN_EMAILS or OWNER_EMAILS (comma-separated) can open the admin dashboard at /admin. */
+export const isAdminEmail = (email: string) => {
+  const e = email.toLowerCase();
+  return emailList(process.env.ADMIN_EMAILS).has(e) || ownerEmails().has(e);
+};
 
 const planFor = (r: UserRow): PlanId =>
   ownerEmails().has(r.email.toLowerCase()) ? "max" : isPlanId(r.plan) ? r.plan : "free";
@@ -66,13 +80,15 @@ const toUser = (r: UserRow): User => ({
   subscriptionStatus: r.subscription_status ?? undefined,
   usage: { day: r.usage_day, count: r.usage_count },
   createdAt: r.created_at.getTime(),
+  suspendedAt: r.suspended_at?.getTime(),
+  isAdmin: isAdminEmail(r.email),
 });
 
 // usage_day comes back as a plain YYYY-MM-DD string rather than a Date.
 const userColumns = (t = "users") =>
   `${t}.id, ${t}.email, ${t}.name, ${t}.password_hash, ${t}.plan, ${t}.stripe_customer_id,
    ${t}.stripe_subscription_id, ${t}.subscription_status,
-   to_char(${t}.usage_day, 'YYYY-MM-DD') as usage_day, ${t}.usage_count, ${t}.created_at`;
+   to_char(${t}.usage_day, 'YYYY-MM-DD') as usage_day, ${t}.usage_count, ${t}.created_at, ${t}.suspended_at`;
 
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -155,6 +171,7 @@ export function toPublicUser(u: User): PublicUser {
     name: u.name,
     plan: u.plan,
     subscriptionStatus: u.subscriptionStatus,
+    isAdmin: u.isAdmin,
     usedToday: u.usage.day === today() ? u.usage.count : 0,
     dailyLimit: PLANS[u.plan].dailyMessages,
     hasBilling: Boolean(u.stripeCustomerId),
@@ -180,8 +197,24 @@ export async function consumeMessage(userId: string, cost = 1) {
 
 // ---- Sessions ----
 
+export class AccountSuspendedError extends Error {
+  constructor() {
+    super("This account has been suspended. Contact support if you think this is a mistake.");
+  }
+}
+
+/** Turns an AccountSuspendedError into a 403 response; anything else is rethrown. */
+export function suspendedResponse(err: unknown) {
+  if (err instanceof AccountSuspendedError) return Response.json({ error: err.message }, { status: 403 });
+  throw err;
+}
+
 export async function startSession(userId: string) {
   const sql = await db();
+  // Every way of signing in (password, reset link, device code) ends here, so this is the one
+  // place a suspended account is turned away.
+  const [active] = await sql`select 1 from users where id = ${userId} and suspended_at is null`;
+  if (!active) throw new AccountSuspendedError();
   const token = crypto.randomBytes(32).toString("base64url");
   await sql`delete from sessions where expires_at < now()`;
   await sql`insert into sessions (token_hash, user_id, expires_at)
@@ -212,7 +245,7 @@ export async function currentUser(): Promise<User | null> {
   const [row] = await sql.unsafe<UserRow[]>(
     `select ${userColumns("u")}
      from sessions s join users u on u.id = s.user_id
-     where s.token_hash = $1 and s.expires_at > now()`,
+     where s.token_hash = $1 and s.expires_at > now() and u.suspended_at is null`,
     [sha256(token)],
   );
   return row ? toUser(row) : null;
