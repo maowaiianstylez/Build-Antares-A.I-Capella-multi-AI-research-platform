@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Antares A.I Capella",
+  title: "Rehua A.I Capella",
   description:
-    "Antares A.I Capella asks every major AI your question, cross-checks them against real sources, and gives you one answer you can trust.",
-  applicationName: "Antares",
-  appleWebApp: { capable: true, title: "Antares", statusBarStyle: "black-translucent" },
+    "Rehua A.I Capella asks every major AI your question, cross-checks them against real sources, and gives you one answer you can trust.",
+  applicationName: "Rehua",
+  appleWebApp: { capable: true, title: "Rehua", statusBarStyle: "black-translucent" },
   icons: { apple: "/icons/apple-touch-icon.png" },
 };
 

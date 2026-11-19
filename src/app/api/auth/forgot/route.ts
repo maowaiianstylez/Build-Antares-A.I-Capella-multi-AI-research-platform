@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     const link = `${appUrl(request)}/reset?token=${token}`;
     await sendEmail(
       user.email,
-      "Reset your Antares password",
-      `Hi ${user.name},\n\nSomeone asked to reset the password for your Antares A.I Capella account. If it was you, open this link within an hour:\n\n${link}\n\nIf it wasn't you, you can ignore this email and your password stays the same.\n\nAntares Systems`,
+      "Reset your Rehua password",
+      `Hi ${user.name},\n\nSomeone asked to reset the password for your Rehua A.I Capella account. If it was you, open this link within an hour:\n\n${link}\n\nIf it wasn't you, you can ignore this email and your password stays the same.\n\nRehua A.I Systems`,
     );
   }
   return Response.json({ ok: true });

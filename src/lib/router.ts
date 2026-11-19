@@ -1,4 +1,4 @@
-// Antares Auto: picks which AI answers a chat message based on what kind of task it is.
+// Rehua Auto: picks which AI answers a chat message based on what kind of task it is.
 // Rules are deliberately simple and readable; tune them as real usage data comes in.
 import type { ProviderId } from "./providers";
 

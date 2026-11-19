@@ -99,7 +99,7 @@ export default function AccountPanel() {
 
       <div className="mt-8 flex gap-3">
         <Link href="/chat" className="rounded-full bg-surface-2 px-5 py-2 text-sm">
-          Back to Antares
+          Back to Rehua
         </Link>
         <button onClick={signOut} className="rounded-full border border-border px-5 py-2 text-sm hover:bg-surface-2">
           Sign out

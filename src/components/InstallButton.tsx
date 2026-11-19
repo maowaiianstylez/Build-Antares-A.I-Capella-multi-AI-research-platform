@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
-/** Offers "Install Antares" where the browser supports it, and Add to Home Screen steps on iPhone/iPad. */
+/** Offers "Install Rehua" where the browser supports it, and Add to Home Screen steps on iPhone/iPad. */
 export default function InstallButton({ className = "" }: { className?: string }) {
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
   const [ios, setIos] = useState(false);
@@ -40,7 +40,7 @@ export default function InstallButton({ className = "" }: { className?: string }
         }}
         className="w-full rounded-xl border border-border px-3 py-2 text-sm hover:bg-surface-2"
       >
-        📲 Install the Antares app
+        📲 Install the Rehua app
       </button>
       {showIosHelp && (
         <p className="mt-2 px-1 text-xs text-muted">

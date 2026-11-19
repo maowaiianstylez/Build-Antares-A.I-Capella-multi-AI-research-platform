@@ -27,7 +27,7 @@ export function lineItemFor(plan: Exclude<PlanId, "free">): Stripe.Checkout.Sess
       currency: "usd",
       unit_amount: PLANS[plan].priceCents,
       recurring: { interval: "month" },
-      product_data: { name: `Antares A.I Capella ${PLANS[plan].name}` },
+      product_data: { name: `Rehua A.I Capella ${PLANS[plan].name}` },
     },
   };
 }

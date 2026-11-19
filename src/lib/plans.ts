@@ -49,7 +49,7 @@ export const PLANS: Record<PlanId, Plan> = {
     features: [
       "2,000 messages a day",
       "Everything in Pro, with 4x the Deep Dives",
-      "Early access to Antares Shield",
+      "Early access to Rehua Shield",
       "Early access to video creation",
     ],
   },

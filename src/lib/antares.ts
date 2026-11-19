@@ -21,21 +21,21 @@ export const MODEL = providerInfo("claude").model;
 export const hasApiKey = () => availableProviders().length > 0;
 const hasClaude = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
-const SYSTEM_PROMPT = `You are Antares, the AI in Antares A.I Capella, a research and results platform built by Antares Systems for everyday people.
+const SYSTEM_PROMPT = `You are Rehua, the AI in Rehua A.I Capella, a research and results platform built by Rehua A.I Systems for everyday people. Rehua (Rēhua) is the Māori name for the star Antares; if someone asks about the name, you can share that.
 
 You help with research, problem solving, math and calculations, programming, writing, and editing. A conversation may continue on a different device than the one it started on, so pick up naturally where things left off.
 
 Be direct and warm. Lead with the answer, then the support for it. When you state facts someone could rely on, say how confident you are, and ground claims in sources when you have them. Show working for calculations. Use Markdown for structure and fenced code blocks for code. If the person may be on the move (for example they say they are driving), keep answers short and easy to listen to.`;
 
-const EVIDENCE_PROMPT = `You are the evidence-gathering stage of Antares Deep Dive. Search the web for the user's latest question. Prefer primary and authoritative sources (official bodies, peer-reviewed research, original data, reputable outlets) and look for sources that disagree.
+const EVIDENCE_PROMPT = `You are the evidence-gathering stage of Rehua Deep Dive. Search the web for the user's latest question. Prefer primary and authoritative sources (official bodies, peer-reviewed research, original data, reputable outlets) and look for sources that disagree.
 
 Write an evidence brief, not an answer: a list of the key facts and figures you found, each followed by the URL it came from, then a short note on where sources conflict or evidence is thin. Be neutral and complete; other models will reason from this brief.`;
 
-const PANEL_PROMPT = `You are one of several independent AI analysts on an Antares Deep Dive panel. You'll get a question and an evidence brief gathered from the web. Answer the question on your own judgment. Use the evidence, say where you think it is weak, and add relevant knowledge of your own, marking anything not in the brief as such.
+const PANEL_PROMPT = `You are one of several independent AI analysts on an Rehua Deep Dive panel. You'll get a question and an evidence brief gathered from the web. Answer the question on your own judgment. Use the evidence, say where you think it is weak, and add relevant knowledge of your own, marking anything not in the brief as such.
 
 Format: start with a one-paragraph answer, then up to five bullet points of key reasoning, then a final line "Confidence: high, medium, or low" with a few words on why. Keep it under 350 words.`;
 
-const SYNTHESIS_PROMPT = `You are Antares, writing the final answer of a Deep Dive. You have the user's question, an evidence brief with numbered sources, and independent answers from a panel of AI models. Cross-check the panel against the evidence and each other, then write the answer the user will rely on.
+const SYNTHESIS_PROMPT = `You are Rehua, writing the final answer of a Deep Dive. You have the user's question, an evidence brief with numbered sources, and independent answers from a panel of AI models. Cross-check the panel against the evidence and each other, then write the answer the user will rely on.
 
 Structure:
 1. **Answer**: the bottom line in two or three sentences.
@@ -61,7 +61,7 @@ function toApiMessages(history: ChatMessage[]): ApiMessage[] {
 
 /**
  * Picks the model for a single-model chat: the user's choice if configured, otherwise
- * Antares Auto routes by task type (see router.ts), falling back to any connected model.
+ * Rehua Auto routes by task type (see router.ts), falling back to any connected model.
  */
 export function resolveModel(choice: ModelChoice, text = ""): { target: ProviderInfo; task?: Task } | null {
   const available = availableProviders();
@@ -75,7 +75,7 @@ export function resolveModel(choice: ModelChoice, text = ""): { target: Provider
 }
 
 /**
- * Streams Antares' reply: text, status, sources, which model answered, and Deep Dive panel results.
+ * Streams Rehua' reply: text, status, sources, which model answered, and Deep Dive panel results.
  */
 export async function* runAntares(
   history: ChatMessage[],
@@ -114,7 +114,7 @@ async function* deepDive(history: ChatMessage[]): AsyncGenerator<StreamEvent> {
   const question = history.at(-1)?.text ?? "";
   const context = history
     .slice(-7, -1)
-    .map((m) => `${m.role === "user" ? "User" : "Antares"}: ${m.text.slice(0, 1500)}`)
+    .map((m) => `${m.role === "user" ? "User" : "Rehua"}: ${m.text.slice(0, 1500)}`)
     .join("\n\n");
 
   // 1. Evidence: Claude searches the web and writes a neutral brief.
@@ -170,7 +170,7 @@ ${sourceList || "(none)"}`;
   const panelText = results
     .map((r) => `### ${r.name} (${r.company}, ${r.model})\n${r.error ? `Did not answer: ${r.error}` : r.text}`)
     .join("\n\n");
-  yield { type: "model", provider: "claude", name: "Antares Deep Dive" };
+  yield { type: "model", provider: "claude", name: "Rehua Deep Dive" };
   yield* claudeStream({
     system: SYNTHESIS_PROMPT,
     messages: [{ role: "user", content: `${casePrompt}\n\nPanel answers:\n\n${panelText}` }],
@@ -261,7 +261,7 @@ async function* claudeStream(opts: {
 
     const final = await stream.finalMessage();
     if (final.stop_reason === "refusal") {
-      yield { type: "error", message: "Antares can't help with that request." };
+      yield { type: "error", message: "Rehua can't help with that request." };
       return;
     }
     if (final.stop_reason !== "pause_turn") return;
@@ -281,7 +281,7 @@ async function* typeOut(text: string): AsyncGenerator<StreamEvent> {
 }
 
 async function* demoReply(prompt: string): AsyncGenerator<StreamEvent> {
-  yield* typeOut(`**Antares is running in demo mode.** No AI provider keys are configured on this server yet, so this is a placeholder reply.
+  yield* typeOut(`**Rehua is running in demo mode.** No AI provider keys are configured on this server yet, so this is a placeholder reply.
 
 You asked: _"${prompt.slice(0, 200)}"_
 
@@ -309,10 +309,10 @@ async function* demoDeepDive(prompt: string): AsyncGenerator<StreamEvent> {
   }
   yield { type: "status", text: "Cross-checking the models and writing your answer…" };
   await sleep(400);
-  yield { type: "model", provider: "claude", name: "Antares Deep Dive" };
+  yield { type: "model", provider: "claude", name: "Rehua Deep Dive" };
   yield* typeOut(`**Deep Dive is running in demo mode.**
 
 You asked: _"${prompt.slice(0, 200)}"_
 
-With API keys configured, Antares would search the web for evidence [1], ask each connected AI model the same question, and then cross-check their answers against the evidence and each other. The final answer shows where the models agree, where they differ, and how confident you can be.`);
+With API keys configured, Rehua would search the web for evidence [1], ask each connected AI model the same question, and then cross-check their answers against the evidence and each other. The final answer shows where the models agree, where they differ, and how confident you can be.`);
 }

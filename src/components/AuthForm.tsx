@@ -44,7 +44,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
     <div className="mx-auto w-full max-w-sm px-4 py-16">
       <StarMark className="mx-auto h-12 w-12" />
       <h1 className="mt-4 text-center text-2xl font-semibold">
-        {signup ? "Create your Antares account" : "Welcome back"}
+        {signup ? "Create your Rehua account" : "Welcome back"}
       </h1>
       <form
         className="mt-8 space-y-3"
@@ -97,7 +97,7 @@ export default function AuthForm({ mode }: { mode: "signin" | "signup" }) {
         </button>
       </form>
       <p className="mt-4 text-center text-sm text-muted">
-        {signup ? "Already have an account? " : "New to Antares? "}
+        {signup ? "Already have an account? " : "New to Rehua? "}
         <Link href={signup ? "/signin" : "/signup"} className="text-capella underline">
           {signup ? "Sign in" : "Create an account"}
         </Link>
