@@ -1,4 +1,4 @@
-// The AI platforms Antares can consult. Claude is called through the Anthropic SDK in
+// The AI platforms Rehua can consult. Claude is called through the Anthropic SDK in
 // antares.ts; the others all publish OpenAI-compatible chat endpoints, so one client covers them.
 import OpenAI from "openai";
 

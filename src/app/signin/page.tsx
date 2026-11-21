@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AuthForm from "@/components/AuthForm";
 import { SiteHeader } from "@/components/SiteHeader";
 
-export const metadata: Metadata = { title: "Sign in · Antares A.I Capella" };
+export const metadata: Metadata = { title: "Sign in · Rehua A.I Capella" };
 
 export default function Page() {
   return (

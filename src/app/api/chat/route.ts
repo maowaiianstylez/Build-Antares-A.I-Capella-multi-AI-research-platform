@@ -94,9 +94,9 @@ export async function POST(request: Request) {
           }
         }
       } catch (err) {
-        console.error("Antares stream failed", err);
-        full += "\n\n_Antares hit an error while answering. Please try again._";
-        send({ type: "error", message: "Antares hit an error while answering." });
+        console.error("Rehua stream failed", err);
+        full += "\n\n_Rehua hit an error while answering. Please try again._";
+        send({ type: "error", message: "Rehua hit an error while answering." });
       }
       await sync(false);
       send({ type: "done" });

@@ -21,7 +21,7 @@ export type ChatMessage = {
   text: string;
   sources?: Source[];
   panel?: PanelEntry[];
-  /** Which model wrote this reply, e.g. "Gemini" or "Antares Deep Dive". */
+  /** Which model wrote this reply, e.g. "Gemini" or "Rehua Deep Dive". */
   modelName?: string;
   device?: string;
   streaming?: boolean;

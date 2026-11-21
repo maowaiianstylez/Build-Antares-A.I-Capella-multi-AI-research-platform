@@ -25,7 +25,7 @@ export function SiteHeader() {
             href="/chat"
             className="rounded-full bg-capella px-4 py-1.5 font-medium text-background hover:brightness-110"
           >
-            Launch Antares
+            Launch Rehua
           </Link>
         </div>
       </nav>

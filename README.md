@@ -1,19 +1,19 @@
-# Antares A.I Capella
+# Rehua A.I Capella
 
-A deep research and results platform for everyday people. Antares asks every major AI (Claude, ChatGPT, Gemini, Grok, DeepSeek) your question, cross-checks their answers against real web sources and each other, and gives you one sourced answer. Conversations sync across your home system, phone, tablet, computer, and vehicle.
+A deep research and results platform for everyday people. Rehua asks every major AI (Claude, ChatGPT, Gemini, Grok, DeepSeek) your question, cross-checks their answers against real web sources and each other, and gives you one sourced answer. Conversations sync across your home system, phone, tablet, computer, and vehicle.
 
 ## What works today (MVP)
 
-- **Website** (`/`): landing page covering capabilities, device sync, and Antares Shield.
+- **Website** (`/`): landing page covering capabilities, device sync, and Rehua Shield.
 - **Chat app** (`/chat`): streaming answers, Markdown and code rendering, conversation history.
 - **Deep Dive** (Pro and Max, counts as 5 messages): (1) Claude searches the web and writes a neutral evidence brief; (2) every connected model answers independently from that evidence, in parallel; (3) Claude cross-checks the panel against the sources and writes the final answer: bottom line, cited evidence, where models agree and differ, confidence. Each model's answer is shown in a collapsible panel. A model that fails or times out is skipped, not fatal.
-- **Model picker**: chat with Claude, ChatGPT, Gemini, Grok, DeepSeek, or Kimi, or "Antares Auto", which routes each message by task type. Only providers with a key appear.
+- **Model picker**: chat with Claude, ChatGPT, Gemini, Grok, DeepSeek, or Kimi, or "Rehua Auto", which routes each message by task type. Only providers with a key appear.
 - **Cross-device sync**: "Link another device" shows a 6-character code / link. Every linked device shares the same conversations, and a reply that is still being written shows up live on the others. If the asking device disconnects mid-answer, the server keeps generating and saves the reply.
 - **Accounts**: email + password sign-up and sign-in (scrypt-hashed passwords, HttpOnly session cookies, attempt limits). Signing in on any device joins your conversations. A one-time 6-character code signs in a phone or car without typing a password.
 - **Plans**: Free (25 messages/day), Pro $19.99/mo (500/day + deep research), Max $49.99/mo (2,000/day + early access). Defined in `src/lib/plans.ts` and enforced on the server.
 - **Stripe payments**: Checkout for subscriptions, the Stripe customer portal for card changes and cancellation, and a signed webhook that turns plans on and off.
 - **Voice**: tap the mic to ask out loud, "Read aloud" speaks answers, and "Hands-free" loops listen → answer → speak → listen for home and car use. Uses the browser's built-in speech engines (Chrome, Edge, Safari), so no extra service or key.
-- **Installable app**: a web app manifest and icons let people install Antares on phones, tablets, computers and car screens ("Install the Antares app" in the chat sidebar, or Add to Home Screen on iPhone).
+- **Installable app**: a web app manifest and icons let people install Rehua on phones, tablets, computers and car screens ("Install the Rehua app" in the chat sidebar, or Add to Home Screen on iPhone).
 - **Password reset**: "Forgot password?" emails a one-hour, single-use link through Resend (`RESEND_API_KEY`, `EMAIL_FROM`). Resetting signs the account out everywhere. Without email keys the link is printed to the server log.
 - **Demo mode**: runs without an AI key so the site and sync can be tried immediately.
 
@@ -57,7 +57,7 @@ Add any of these keys; each provider is optional and is used only when its key i
 
 **Deep Dive panel:** by default the core four (Claude, ChatGPT, Gemini, Grok) that have keys. DeepSeek and Kimi join only when listed in `DEEP_DIVE_PANEL`, e.g. `claude,openai,gemini,grok,deepseek,kimi`. They can always be picked by hand in chat, labeled with where data is processed.
 
-**Antares Auto routing** (`src/lib/router.ts`): first matching rule wins, skipping providers without a key, and Auto only routes to the core four.
+**Rehua Auto routing** (`src/lib/router.ts`): first matching rule wins, skipping providers without a key, and Auto only routes to the core four.
 
 | Task | Detected by | Goes to |
 |---|---|---|
@@ -90,7 +90,7 @@ To use every feature yourself without paying, set `OWNER_EMAILS` to your account
 | `src/app/page.tsx` | Marketing site |
 | `src/components/ChatApp.tsx` | Chat UI, polling sync, device-link dialog |
 | `src/app/api/chat/route.ts` | Streams replies (NDJSON) and mirrors them into storage for other devices |
-| `src/lib/antares.ts` | Antares engine: single-model chat, the Deep Dive pipeline, demo mode |
+| `src/lib/antares.ts` | Rehua engine: single-model chat, the Deep Dive pipeline, demo mode |
 | `src/lib/providers.ts` | Provider registry and calls for ChatGPT, Gemini, Grok, DeepSeek |
 | `src/lib/db.ts` | Postgres connection and schema (created automatically) |
 | `src/lib/store.ts` | Conversations and messages |
@@ -104,5 +104,5 @@ To use every feature yourself without paying, set `OWNER_EMAILS` to your account
 - Email verification, and optionally Google/Apple sign-in.
 - Replace polling with WebSockets/SSE for lower handoff latency.
 - Native mobile and car apps (CarPlay / Android Auto).
-- Antares Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
+- Rehua Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
 - Video creation pipeline.

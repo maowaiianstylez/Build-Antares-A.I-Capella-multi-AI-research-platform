@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import UpgradeButton from "@/components/UpgradeButton";
 import { PLANS, formatPrice } from "@/lib/plans";
 
-export const metadata: Metadata = { title: "Pricing · Antares A.I Capella" };
+export const metadata: Metadata = { title: "Pricing · Rehua A.I Capella" };
 
 export default function PricingPage() {
   const plans = [PLANS.free, PLANS.pro, PLANS.max];
@@ -57,7 +57,7 @@ export default function PricingPage() {
           ))}
         </div>
         <p className="mt-10 text-center text-xs text-muted">
-          Prices in USD. Payments are processed securely by Stripe. Antares never sees your card number.
+          Prices in USD. Payments are processed securely by Stripe. Rehua never sees your card number.
         </p>
       </main>
     </div>

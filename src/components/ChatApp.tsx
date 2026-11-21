@@ -179,7 +179,7 @@ export default function ChatApp() {
         const data = await res.json().catch(() => ({}));
         setMessages((all) => all.filter((m) => m.id !== pendingId && m.id !== userMsgId));
         setInput(text);
-        setNotice({ text: data.error ?? "Couldn't reach Antares. Please try again.", upgrade: data.upgrade });
+        setNotice({ text: data.error ?? "Couldn't reach Rehua. Please try again.", upgrade: data.upgrade });
         return;
       }
 
@@ -214,7 +214,7 @@ export default function ChatApp() {
       }
       finished = true;
     } catch {
-      patchReply((m) => ({ ...m, text: m.text || "_Couldn't reach Antares. Please try again._" }));
+      patchReply((m) => ({ ...m, text: m.text || "_Couldn't reach Rehua. Please try again._" }));
     } finally {
       patchReply((m) => ({ ...m, streaming: false }));
       setStatus(null);
@@ -242,7 +242,7 @@ export default function ChatApp() {
       >
         <div className="flex items-center justify-between p-4">
           <Link href="/" className="flex items-center gap-2 font-semibold">
-            <StarMark className="h-6 w-6" /> Antares
+            <StarMark className="h-6 w-6" /> Rehua
           </Link>
           <button className="text-muted md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
             ✕
@@ -322,7 +322,7 @@ export default function ChatApp() {
             ☰
           </button>
           <span className="truncate text-sm text-muted">
-            {convos.find((c) => c.id === activeId)?.title ?? "Antares A.I Capella"}
+            {convos.find((c) => c.id === activeId)?.title ?? "Rehua A.I Capella"}
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {!live && (
@@ -369,7 +369,7 @@ export default function ChatApp() {
                 <StarMark className="mx-auto h-14 w-14" />
                 <h1 className="mt-4 text-2xl font-semibold">What do you want to get to the bottom of?</h1>
                 <p className="mt-2 text-sm text-muted">
-                  Turn on Deep Dive and Antares asks every connected AI, checks them against real sources, and
+                  Turn on Deep Dive and Rehua asks every connected AI, checks them against real sources, and
                   gives you one answer you can trust.
                 </p>
                 <div className="mx-auto mt-8 grid max-w-xl gap-2 sm:grid-cols-2">
@@ -424,7 +424,7 @@ export default function ChatApp() {
                       </button>
                     )}
                     {m.streaming && !m.text && (
-                      <p className="animate-pulse text-sm text-muted">{status ?? "Antares is answering…"}</p>
+                      <p className="animate-pulse text-sm text-muted">{status ?? "Rehua is answering…"}</p>
                     )}
                     {!!m.sources?.length && (
                       <div className="mt-3">
@@ -489,7 +489,7 @@ export default function ChatApp() {
                 }}
                 rows={1}
                 placeholder={
-                  voice.listening ? "Listening…" : research ? "What should Antares research?" : "Ask Antares anything…"
+                  voice.listening ? "Listening…" : research ? "What should Rehua research?" : "Ask Rehua anything…"
                 }
                 className="max-h-48 w-full resize-none bg-transparent px-4 pt-3 outline-none placeholder:text-muted"
               />
@@ -516,7 +516,7 @@ export default function ChatApp() {
                     aria-label="AI model"
                     className="min-w-0 rounded-full border border-border bg-surface px-2 py-1 text-xs text-muted outline-none"
                   >
-                    <option value="auto">Antares Auto</option>
+                    <option value="auto">Rehua Auto</option>
                     {providers.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.region === "US" ? p.name : `${p.name} (data processed in ${p.region})`}
@@ -549,7 +549,7 @@ export default function ChatApp() {
               </div>
             </div>
             <p className="mt-2 text-center text-xs text-muted">
-              Antares can make mistakes. Check important facts against the cited sources.
+              Rehua can make mistakes. Check important facts against the cited sources.
             </p>
           </form>
         </div>

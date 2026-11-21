@@ -20,7 +20,7 @@ export function Wordmark() {
     <span className="flex items-center gap-2 font-semibold tracking-wide">
       <StarMark />
       <span>
-        ANTARES <span className="text-capella">A.I</span>
+        REHUA <span className="text-capella">A.I</span>
       </span>
     </span>
   );

@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 
-// Lets people install Antares on their phone, tablet, computer, or car screen like a native app.
+// Lets people install Rehua on their phone, tablet, computer, or car screen like a native app.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Antares A.I Capella",
-    short_name: "Antares",
+    name: "Rehua A.I Capella",
+    short_name: "Rehua",
     description: "Every major AI. One answer you can trust.",
     start_url: "/chat",
     scope: "/",
