@@ -83,6 +83,12 @@ Prices are created on the fly from `src/lib/plans.ts`, so no products need to be
 
 To use every feature yourself without paying, set `OWNER_EMAILS` to your account's email (comma-separate several). Those accounts are always treated as Max. Sign up with that email before setting it, since emails aren't verified yet.
 
+## Admin dashboard
+
+`/admin` shows every account with its plan, subscription status, messages today and all time, last activity, and sign-up date, plus totals (accounts, paying users, monthly revenue, messages today). From there an admin can suspend an account, which signs it out on every device and blocks sign-in, or unsuspend it. Suspending doesn't cancel a Stripe subscription.
+
+Admins are the accounts whose emails are in `ADMIN_EMAILS` (comma-separated). Emails in `OWNER_EMAILS` are admins too. As with `OWNER_EMAILS`, sign up with the email before adding it. Admins can't suspend themselves or each other. An "Admin dashboard" button appears on the account page for admins; everyone else gets a 404 at `/admin` and `/api/admin/*`.
+
 ## Layout
 
 | Path | What it is |
@@ -98,6 +104,7 @@ To use every feature yourself without paying, set `OWNER_EMAILS` to your account
 | `src/lib/plans.ts` | Plan names, prices, and limits |
 | `src/lib/billing.ts`, `src/app/api/billing/*`, `src/app/api/stripe/webhook` | Stripe checkout, portal, webhook |
 | `src/app/pricing`, `src/app/account`, `src/app/signin`, `src/app/signup` | Pricing, account, and auth pages |
+| `src/app/admin`, `src/lib/admin.ts`, `src/app/api/admin/*` | Owner/admin dashboard and account suspension |
 
 ## Before production
 

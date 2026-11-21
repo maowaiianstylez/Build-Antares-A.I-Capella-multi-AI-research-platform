@@ -1,4 +1,4 @@
-import { createDeviceCode, currentUser, redeemDeviceCode, startSession } from "@/lib/auth";
+import { createDeviceCode, currentUser, redeemDeviceCode, startSession, suspendedResponse } from "@/lib/auth";
 import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 // POST -> a short single-use code that signs another device into this account.
@@ -17,6 +17,10 @@ export async function PUT(request: Request) {
   const { code } = await request.json().catch(() => ({}));
   const userId = typeof code === "string" ? await redeemDeviceCode(code) : null;
   if (!userId) return Response.json({ error: "That code has expired or doesn't exist." }, { status: 404 });
-  await startSession(userId);
+  try {
+    await startSession(userId);
+  } catch (err) {
+    return suspendedResponse(err);
+  }
   return Response.json({ ok: true });
 }

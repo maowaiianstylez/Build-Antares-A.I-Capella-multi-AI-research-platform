@@ -101,6 +101,11 @@ export default function AccountPanel() {
         <Link href="/chat" className="rounded-full bg-surface-2 px-5 py-2 text-sm">
           Back to Rehua
         </Link>
+        {user.isAdmin && (
+          <Link href="/admin" className="rounded-full border border-capella/50 px-5 py-2 text-sm text-capella hover:bg-capella/10">
+            Admin dashboard
+          </Link>
+        )}
         <button onClick={signOut} className="rounded-full border border-border px-5 py-2 text-sm hover:bg-surface-2">
           Sign out
         </button>

@@ -1,4 +1,4 @@
-import { resetPassword, startSession } from "@/lib/auth";
+import { resetPassword, startSession, suspendedResponse } from "@/lib/auth";
 import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 // POST { token, password } -> sets the new password and signs this device in.
@@ -14,6 +14,10 @@ export async function POST(request: Request) {
   if (!userId) {
     return Response.json({ error: "This reset link has expired or was already used. Request a new one." }, { status: 400 });
   }
-  await startSession(userId);
+  try {
+    await startSession(userId);
+  } catch (err) {
+    return suspendedResponse(err);
+  }
   return Response.json({ ok: true });
 }
