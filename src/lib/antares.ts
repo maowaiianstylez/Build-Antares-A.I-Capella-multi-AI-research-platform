@@ -1,15 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ChatMessage, PanelEntry, Source } from "./store";
 import { routeTask, type Task } from "./router";
+import { EVIDENCE_PROMPT, PANEL_PROMPT, SYNTHESIS_PROMPT, rehuaSystemPrompt, type Surface } from "./persona";
 import {
   allProviders,
   askCompatible,
   availableProviders,
+  isAvailable,
   panelProviders,
   providerInfo,
+  rehuaMode,
   streamCompatible,
   type ProviderId,
   type ProviderInfo,
+  type SimpleMessage,
 } from "./providers";
 
 /** "chat" talks to one model; "research" is Deep Dive: evidence, a panel of models, then a cross-checked answer. */
@@ -19,31 +23,7 @@ export type ModelChoice = ProviderId | "auto";
 export const MODEL = providerInfo("claude").model;
 
 export const hasApiKey = () => availableProviders().length > 0;
-const hasClaude = () => Boolean(process.env.ANTHROPIC_API_KEY);
-
-const SYSTEM_PROMPT = `You are Rehua, the AI in Rehua A.I Capella, a research and results platform built by Rehua A.I Systems for everyday people. Rehua (Rēhua) is the Māori name for the star Antares; if someone asks about the name, you can share that.
-
-You help with research, problem solving, math and calculations, programming, writing, and editing. A conversation may continue on a different device than the one it started on, so pick up naturally where things left off.
-
-Be direct and warm. Lead with the answer, then the support for it. When you state facts someone could rely on, say how confident you are, and ground claims in sources when you have them. Show working for calculations. Use Markdown for structure and fenced code blocks for code. If the person may be on the move (for example they say they are driving), keep answers short and easy to listen to.`;
-
-const EVIDENCE_PROMPT = `You are the evidence-gathering stage of Rehua Deep Dive. Search the web for the user's latest question. Prefer primary and authoritative sources (official bodies, peer-reviewed research, original data, reputable outlets) and look for sources that disagree.
-
-Write an evidence brief, not an answer: a list of the key facts and figures you found, each followed by the URL it came from, then a short note on where sources conflict or evidence is thin. Be neutral and complete; other models will reason from this brief.`;
-
-const PANEL_PROMPT = `You are one of several independent AI analysts on an Rehua Deep Dive panel. You'll get a question and an evidence brief gathered from the web. Answer the question on your own judgment. Use the evidence, say where you think it is weak, and add relevant knowledge of your own, marking anything not in the brief as such.
-
-Format: start with a one-paragraph answer, then up to five bullet points of key reasoning, then a final line "Confidence: high, medium, or low" with a few words on why. Keep it under 350 words.`;
-
-const SYNTHESIS_PROMPT = `You are Rehua, writing the final answer of a Deep Dive. You have the user's question, an evidence brief with numbered sources, and independent answers from a panel of AI models. Cross-check the panel against the evidence and each other, then write the answer the user will rely on.
-
-Structure:
-1. **Answer**: the bottom line in two or three sentences.
-2. **What the evidence shows**: the key points, each cited with source numbers like [1] or [2][4]. Only cite numbers from the source list.
-3. **Where the models agree** and **where they differ**: name the models, and say which view the evidence supports better.
-4. **Confidence**: high, medium, or low, and what would change it.
-
-Do not invent sources. If the panel agrees on something the evidence does not support, say so.`;
+const hasClaude = () => isAvailable("claude");
 
 export type StreamEvent =
   | { type: "text"; text: string }
@@ -59,31 +39,90 @@ function toApiMessages(history: ChatMessage[]): ApiMessage[] {
   return history.filter((m) => m.text.trim()).map((m) => ({ role: m.role, content: m.text }));
 }
 
+const toSimpleMessages = (messages: ApiMessage[]): SimpleMessage[] =>
+  messages.map((m) => ({
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: typeof m.content === "string" ? m.content : "",
+  }));
+
 /**
- * Picks the model for a single-model chat: the user's choice if configured, otherwise
- * Rehua Auto routes by task type (see router.ts), falling back to any connected model.
+ * Picks the models for a single-model chat, best first: the user's choice if connected, otherwise
+ * Rehua Auto routes by task type (see router.ts), with the next candidates as fallbacks.
  */
-export function resolveModel(choice: ModelChoice, text = ""): { target: ProviderInfo; task?: Task } | null {
+export function resolveModel(choice: ModelChoice, text = ""): { candidates: ProviderInfo[]; task?: Task } | null {
   const available = availableProviders();
   if (choice !== "auto") {
     const target = available.find((p) => p.id === choice);
-    return target ? { target } : null;
+    return target ? { candidates: [target] } : null;
   }
   const { task, prefer } = routeTask(text);
-  const target = prefer.map((id) => available.find((p) => p.id === id)).find(Boolean) ?? available[0];
-  return target ? { target, task } : null;
+  const ranked = prefer.map((id) => available.find((p) => p.id === id)).filter((p): p is ProviderInfo => Boolean(p));
+  const candidates = ranked.length ? ranked : available.slice(0, 1);
+  return candidates.length ? { candidates, task } : null;
+}
+
+type StreamOpts = { effort: "low" | "medium" | "high"; searches: number };
+
+/** Streams one reply from any provider. Only Claude has web search wired in. */
+async function* streamFrom(
+  target: ProviderInfo,
+  system: string,
+  messages: ApiMessage[],
+  opts: StreamOpts,
+): AsyncGenerator<StreamEvent> {
+  if (target.id === "claude") {
+    yield* claudeStream({ system, messages, ...opts });
+    return;
+  }
+  for await (const text of streamCompatible(target.id, system, toSimpleMessages(messages))) {
+    yield { type: "text", text };
+  }
+}
+
+const MAX_ATTEMPTS = 3;
+
+/**
+ * Tries each candidate in turn. If one fails before it has said anything (a self-hosted server
+ * is down, a partner API errors), the next one answers instead, so users still get a reply.
+ */
+async function* streamWithFallback(
+  candidates: ProviderInfo[],
+  label: (p: ProviderInfo) => string,
+  system: string,
+  messages: ApiMessage[],
+  opts: StreamOpts,
+): AsyncGenerator<StreamEvent> {
+  const tries = candidates.slice(0, MAX_ATTEMPTS);
+  for (const [i, target] of tries.entries()) {
+    yield { type: "model", provider: target.id, name: label(target) };
+    let produced = false;
+    try {
+      for await (const ev of streamFrom(target, system, messages, opts)) {
+        if (ev.type === "text") produced = true;
+        yield ev;
+      }
+      return;
+    } catch (err) {
+      const next = tries.at(i + 1);
+      if (produced || !next) throw err;
+      console.error(`${target.name} failed; falling back to ${next.name}`, err);
+      yield { type: "status", text: `${target.name} was unavailable, so ${next.name} is answering…` };
+    }
+  }
 }
 
 /**
- * Streams Rehua' reply: text, status, sources, which model answered, and Deep Dive panel results.
+ * Streams Rehua's reply: text, status, sources, which model answered, and Deep Dive panel results.
+ * `surface` tunes Rehua's speaking style for the device (chat, voice, vehicle, wearable, TV, home).
  */
 export async function* runAntares(
   history: ChatMessage[],
   mode: Mode,
   choice: ModelChoice = "auto",
+  surface: Surface = "chat",
 ): AsyncGenerator<StreamEvent> {
   if (mode === "research") {
-    yield* hasClaude() ? deepDive(history) : demoDeepDive(history.at(-1)?.text ?? "");
+    yield* hasApiKey() ? deepDive(history) : demoDeepDive(history.at(-1)?.text ?? "");
     return;
   }
 
@@ -97,18 +136,25 @@ export async function* runAntares(
     return;
   }
 
-  const { target, task } = routed;
-  yield { type: "model", provider: target.id, name: task ? `${target.name} · Auto picked for ${task}` : target.name };
-  if (target.id === "claude") {
-    yield* claudeStream({ system: SYSTEM_PROMPT, messages: toApiMessages(history), effort: "low", searches: 3 });
-  } else {
-    for await (const text of streamCompatible(target.id, SYSTEM_PROMPT, toApiMessages(history) as never)) {
-      yield { type: "text", text };
-    }
-  }
+  const { candidates, task } = routed;
+  yield* streamWithFallback(
+    candidates,
+    (p) => (task ? `${p.name} · Auto picked for ${task}` : p.name),
+    rehuaSystemPrompt(surface),
+    toApiMessages(history),
+    { effort: "low", searches: 3 },
+  );
 }
 
 // ---- Deep Dive ----
+
+/** Who writes the final Deep Dive answer, best first. Rehua's own model leads outside hybrid mode. */
+function synthesisCandidates(): ProviderInfo[] {
+  const lead: ProviderId[] = rehuaMode() === "hybrid" ? ["claude", "rehua"] : ["rehua", "claude"];
+  const available = availableProviders();
+  const first = lead.map((id) => available.find((p) => p.id === id)).filter((p): p is ProviderInfo => Boolean(p));
+  return [...first, ...available.filter((p) => !lead.includes(p.id))];
+}
 
 async function* deepDive(history: ChatMessage[]): AsyncGenerator<StreamEvent> {
   const question = history.at(-1)?.text ?? "";
@@ -117,39 +163,45 @@ async function* deepDive(history: ChatMessage[]): AsyncGenerator<StreamEvent> {
     .map((m) => `${m.role === "user" ? "User" : "Rehua"}: ${m.text.slice(0, 1500)}`)
     .join("\n\n");
 
-  // 1. Evidence: Claude searches the web and writes a neutral brief.
-  yield { type: "status", text: "Gathering evidence from the web…" };
+  // 1. Evidence: Claude searches the web and writes a neutral brief. Without Claude (for example
+  //    in independent mode) this step is skipped and the panel answers from its own knowledge.
   const sources: Source[] = [];
   let brief = "";
-  for await (const ev of claudeStream({
-    system: EVIDENCE_PROMPT,
-    messages: toApiMessages(history),
-    effort: "medium",
-    searches: 8,
-  })) {
-    if (ev.type === "source") {
-      sources.push(ev.source);
-      yield ev;
-    } else if (ev.type === "text") {
-      brief += ev.text;
-    } else if (ev.type === "status") {
-      yield { type: "status", text: "Searching the web…" };
-    } else if (ev.type === "error") {
-      yield ev;
-      return;
+  if (hasClaude()) {
+    yield { type: "status", text: "Gathering evidence from the web…" };
+    for await (const ev of claudeStream({
+      system: EVIDENCE_PROMPT,
+      messages: toApiMessages(history),
+      effort: "medium",
+      searches: 8,
+    })) {
+      if (ev.type === "source") {
+        sources.push(ev.source);
+        yield ev;
+      } else if (ev.type === "text") {
+        brief += ev.text;
+      } else if (ev.type === "status") {
+        yield { type: "status", text: "Searching the web…" };
+      } else if (ev.type === "error") {
+        yield ev;
+        return;
+      }
     }
+  } else {
+    yield { type: "status", text: "Web search isn't connected, so the panel will answer from its own knowledge…" };
   }
   const sourceList = sources.map((s, i) => `[${i + 1}] ${s.title} — ${s.url}`).join("\n");
   const casePrompt = `${context ? `Earlier conversation:\n${context}\n\n` : ""}Question: ${question}
 
 Evidence brief:
-${brief || "(No web evidence was found.)"}
+${brief || "(No web evidence was gathered.)"}
 
 Sources:
 ${sourceList || "(none)"}`;
 
   // 2. Panel: every connected model answers independently, in parallel.
-  const panel = panelProviders();
+  const core = panelProviders();
+  const panel = core.length ? core : availableProviders();
   yield { type: "status", text: `Consulting ${panel.length} AI model${panel.length === 1 ? "" : "s"}: ${panel.map((p) => p.name).join(", ")}…` };
   const pending = new Map(
     panel.map((p) => [
@@ -165,18 +217,18 @@ ${sourceList || "(none)"}`;
     yield { type: "panel", entry };
   }
 
-  // 3. Synthesis: Claude cross-checks the panel against the evidence and writes the answer.
+  // 3. Synthesis: one model cross-checks the panel against the evidence and writes the answer.
   yield { type: "status", text: "Cross-checking the models and writing your answer…" };
   const panelText = results
     .map((r) => `### ${r.name} (${r.company}, ${r.model})\n${r.error ? `Did not answer: ${r.error}` : r.text}`)
     .join("\n\n");
-  yield { type: "model", provider: "claude", name: "Rehua Deep Dive" };
-  yield* claudeStream({
-    system: SYNTHESIS_PROMPT,
-    messages: [{ role: "user", content: `${casePrompt}\n\nPanel answers:\n\n${panelText}` }],
-    effort: "high",
-    searches: 0,
-  });
+  yield* streamWithFallback(
+    synthesisCandidates(),
+    () => "Rehua Deep Dive",
+    SYNTHESIS_PROMPT,
+    [{ role: "user", content: `${casePrompt}\n\nPanel answers:\n\n${panelText}` }],
+    { effort: "high", searches: 0 },
+  );
 }
 
 const PANEL_TIMEOUT_MS = 120_000;
@@ -285,14 +337,14 @@ async function* demoReply(prompt: string): AsyncGenerator<StreamEvent> {
 
 You asked: _"${prompt.slice(0, 200)}"_
 
-Add \`ANTHROPIC_API_KEY\` (and optionally OpenAI, Gemini, xAI and DeepSeek keys) to the server environment and restart. Everything else here, including accounts, plans, and syncing across your devices, already works.`);
+Connect Rehua's own model with \`REHUA_LLM_URL\`, or add \`ANTHROPIC_API_KEY\` (and optionally OpenAI, Gemini, xAI and DeepSeek keys), then restart. Everything else here, including accounts, plans, and syncing across your devices, already works.`);
 }
 
 async function* demoDeepDive(prompt: string): AsyncGenerator<StreamEvent> {
   yield { type: "status", text: "Gathering evidence from the web…" };
   await sleep(600);
   yield { type: "source", source: { url: "https://example.com/demo-source", title: "Example source (demo)" } };
-  const panel = allProviders().filter((p) => p.region === "US");
+  const panel = allProviders().filter((p) => p.region === "US" && p.kind !== "self-hosted");
   yield { type: "status", text: `Consulting ${panel.length} AI models…` };
   for (const p of panel) {
     await sleep(250);

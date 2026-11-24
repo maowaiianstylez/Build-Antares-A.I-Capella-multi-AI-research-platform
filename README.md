@@ -48,16 +48,17 @@ Add any of these keys; each provider is optional and is used only when its key i
 
 | Provider | Key | Model override | Default model |
 |---|---|---|---|
-| Claude (Anthropic) | `ANTHROPIC_API_KEY` (required for Deep Dive) | `ANTARES_MODEL` | `claude-opus-5-5` |
+| Rehua (Rehua's own, self-hosted) | `REHUA_LLM_URL` (+ optional `REHUA_LLM_API_KEY`) | `REHUA_LLM_MODEL` | `rehua-1` |
+| Claude (Anthropic) | `ANTHROPIC_API_KEY` (gives Deep Dive its web evidence) | `CLAUDE_MODEL` (old name `ANTARES_MODEL` still works) | `claude-opus-5-5` |
 | ChatGPT (OpenAI) | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-5.6-sol` |
 | Gemini (Google) | `GEMINI_API_KEY` | `GEMINI_MODEL` | `gemini-3.1-pro-preview` |
 | Grok (xAI) | `XAI_API_KEY` | `XAI_MODEL` | `grok-4.5` |
 | DeepSeek (optional, data processed in China) | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `deepseek-v4-pro` |
 | Kimi (Moonshot AI, optional, data processed in China) | `KIMI_API_KEY` | `KIMI_MODEL` | `kimi-k3.1-pro` |
 
-**Deep Dive panel:** by default the core four (Claude, ChatGPT, Gemini, Grok) that have keys. DeepSeek and Kimi join only when listed in `DEEP_DIVE_PANEL`, e.g. `claude,openai,gemini,grok,deepseek,kimi`. They can always be picked by hand in chat, labeled with where data is processed.
+**Deep Dive panel:** by default the core providers that are connected: Rehua's own model, Claude, ChatGPT, Gemini and Grok. DeepSeek and Kimi join only when listed in `DEEP_DIVE_PANEL`, e.g. `claude,openai,gemini,grok,deepseek,kimi`. They can always be picked by hand in chat, labeled with where data is processed.
 
-**Rehua Auto routing** (`src/lib/router.ts`): first matching rule wins, skipping providers without a key, and Auto only routes to the core four.
+**Rehua Auto routing** (`src/lib/router.ts`): first matching rule wins, skipping providers without a key, and Auto only routes to the core four plus Rehua's own model (placed first in `rehua-first` and `independent` modes, last in `hybrid`).
 
 | Task | Detected by | Goes to |
 |---|---|---|
@@ -70,6 +71,34 @@ Add any of these keys; each provider is optional and is used only when its key i
 | Everything else | | Claude, ChatGPT, Gemini, Grok |
 
 Providers rename models often. Check each provider's model list when you add a key and set the `*_MODEL` variable if the default has changed. ChatGPT, Gemini, Grok and DeepSeek are called through their OpenAI-compatible endpoints (`src/lib/providers.ts`).
+
+## Running on Rehua's own model
+
+Rehua can run on a model it hosts itself instead of (or alongside) partner models. Any server with an OpenAI-compatible chat API works: [vLLM](https://docs.vllm.ai), [Ollama](https://ollama.com), llama.cpp, NVIDIA NIM, or a GPU cloud.
+
+```bash
+# Example: serve OpenAI's open-weight gpt-oss-20b with vLLM on a GPU machine
+vllm serve openai/gpt-oss-20b --served-model-name rehua-1
+# then on the Rehua server:
+REHUA_LLM_URL=http://<gpu-host>:8000/v1
+
+# Or try it on a laptop with Ollama
+ollama pull gpt-oss:20b
+REHUA_LLM_URL=http://localhost:11434/v1
+REHUA_LLM_MODEL=gpt-oss:20b
+```
+
+`REHUA_MODE` sets how independent Rehua runs:
+
+| `REHUA_MODE` | What happens |
+|---|---|
+| `hybrid` (default) | Partner models answer as before. Rehua's own model can be picked by hand, and is the last fallback. |
+| `rehua-first` | Rehua's own model answers first and writes Deep Dive summaries. If it is down, partners answer instead. |
+| `independent` | Only Rehua's own model is used; partner keys are ignored. For offline, on-premises or defense builds. Deep Dive then answers without web search. |
+
+In every mode, if the chosen model fails before it says anything, Rehua Auto moves to the next candidate (up to three). `REHUA_LLM_REGION` (default `US`) tells users where the self-hosted model runs.
+
+**Rehua persona:** who Rehua is and how it speaks live in `src/lib/persona.ts`, and are sent to whichever model answers, so the brand doesn't depend on a vendor. The chat API takes an optional `surface` (`chat`, `voice`, `vehicle`, `wearable`, `tv`, `home`) that adjusts the speaking style for the device.
 
 ## Turning on payments (Stripe)
 
