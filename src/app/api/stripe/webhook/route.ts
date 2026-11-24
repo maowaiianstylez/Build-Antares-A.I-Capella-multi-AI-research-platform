@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { findUserByStripeCustomer, getUserById, updateUser } from "@/lib/auth";
-import { ACTIVE_STATUSES, stripe } from "@/lib/billing";
+import { ACTIVE_STATUSES, planFromSubscription, stripe } from "@/lib/billing";
 import { isPlanId } from "@/lib/plans";
 
 // Stripe calls this after checkout and whenever a subscription changes. The signature check
@@ -46,10 +46,11 @@ export async function POST(request: Request) {
       if (!user) break;
       // Ignore events for an older subscription once the user has a newer one.
       if (user.stripeSubscriptionId && user.stripeSubscriptionId !== sub.id) break;
-      const plan = sub.metadata?.plan;
+      // Read the plan from the price, so switching Pro <-> Max in the billing portal is picked up.
+      const plan = planFromSubscription(sub);
       const active = event.type !== "customer.subscription.deleted" && ACTIVE_STATUSES.has(sub.status);
       await updateUser(user.id, {
-        plan: active && isPlanId(plan) ? plan : "free",
+        plan: active && plan ? plan : "free",
         stripeSubscriptionId: sub.id,
         subscriptionStatus: event.type === "customer.subscription.deleted" ? "canceled" : sub.status,
       });

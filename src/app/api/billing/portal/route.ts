@@ -1,5 +1,5 @@
 import { currentUser } from "@/lib/auth";
-import { appUrl, billingEnabled, stripe } from "@/lib/billing";
+import { appUrl, billingEnabled, openPortal } from "@/lib/billing";
 
 // POST -> { url } of the Stripe customer portal (update card, see invoices, cancel).
 export async function POST(request: Request) {
@@ -17,9 +17,6 @@ async function handle(request: Request) {
   if (!billingEnabled() || !user.stripeCustomerId) {
     return Response.json({ error: "No billing account yet." }, { status: 400 });
   }
-  const portal = await stripe().billingPortal.sessions.create({
-    customer: user.stripeCustomerId,
-    return_url: `${appUrl(request)}/account`,
-  });
+  const portal = await openPortal(user.stripeCustomerId, `${appUrl(request)}/account`);
   return Response.json({ url: portal.url });
 }

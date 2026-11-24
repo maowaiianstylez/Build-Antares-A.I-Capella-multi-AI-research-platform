@@ -76,10 +76,12 @@ Providers rename models often. Check each provider's model list when you add a k
 1. Create a Stripe account and copy the **secret key** (start with test mode, `sk_test_...`) into `STRIPE_SECRET_KEY`.
 2. In Stripe, add a webhook endpoint pointing at `https://<your-site>/api/stripe/webhook` with the events `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
    For local testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
-3. In Stripe's Billing settings, turn on the **customer portal** so "Manage billing" works.
+3. Redeploy, then open `/api/health`: `setup.stripe` should say `test` (or `live`) and `setup.stripeWebhook` should be `true`.
 4. Test with card `4242 4242 4242 4242`, any future date, any CVC.
 
-Prices are created on the fly from `src/lib/plans.ts`, so no products need to be set up in Stripe first.
+No products or portal settings need to be made in the Stripe dashboard. The first checkout creates one "Rehua A.I Capella Pro" and one "Max" product with monthly prices from `src/lib/plans.ts` (found again later by lookup key), and the first "Manage billing" click creates a customer portal configuration that allows card updates, invoices, cancelling at period end, and switching between Pro and Max. Changing a price in `plans.ts` creates a new Stripe price for new checkouts; existing subscribers keep their old price.
+
+Optional overrides: `STRIPE_PRICE_PRO` / `STRIPE_PRICE_MAX` to use prices you made in the dashboard, and `STRIPE_PORTAL_CONFIGURATION` to use your own portal configuration.
 
 To use every feature yourself without paying, set `OWNER_EMAILS` to your account's email (comma-separate several). Those accounts are always treated as Max. Sign up with that email before setting it, since emails aren't verified yet.
 
