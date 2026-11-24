@@ -97,6 +97,24 @@ The email lists are forgiving: commas, semicolons, spaces or new lines all work 
 
 Until Resend is set up, "Forgot password?" can't send email (the link only goes to the server log). For the owner, set `OWNER_RESET_CODE` to a long private code (12+ characters). Then open `/owner-reset`, enter an email that's in `ADMIN_EMAILS` or `OWNER_EMAILS` plus that code, and you'll be taken to the normal "choose a new password" page. It's off when `OWNER_RESET_CODE` isn't set, it only works for admin emails, and it allows 5 tries per 15 minutes. Remove the variable once email works if you like.
 
+## Rehua Shield
+
+`/shield` (also in the site header) is the consumer safety tool from the original Antares prototype, rebuilt on Rehua's accounts, plans, and AI providers. It has three parts:
+
+- **Scan a message** (signed in, counts as 1 message): paste a text, email, or link. Rehua's built-in rules look for common scam signs (lookalike brand domains like `usps-redelivery-help.co`, pressure to act fast, gift card or crypto payment, requests for codes), links are checked against Google Web Risk if `WEB_RISK_API_KEY` is set, and then the AI (Claude, or the first connected provider; override the model with `SHIELD_MODEL`) gives a risk level (low, caution, high), the warning signs, and steps to take. A link on Web Risk's list always rates high. If no AI key is set, or the AI call fails, the result is labeled as a basic rules-only check.
+- **Alerts** (anyone): the latest FTC Consumer Alerts and CISA advisories, cached and refreshed every 15 minutes. Both are US government feeds, so they are public domain and fine for a paid app.
+- **Breach check**: "Is your email in a data breach?" looks up only the signed-in user's own account email in Have I Been Pwned, only after they tick a consent box, 5 checks an hour. It is off until `HIBP_API_KEY` is set. "Has a password been leaked?" uses HIBP's free Pwned Passwords range API from the browser: only the first 5 characters of the password's SHA-1 hash leave the device, and Rehua's server never sees it.
+
+Guardrails, following the Antares overview: Shield is opt-in and only sees what the user gives it. It never reads email, texts, or other private messages. Pasted content isn't stored. It never files a report: for risky results it links to the FTC and FBI IC3 forms and can prepare a summary for the user to review, copy, and submit themselves.
+
+| Variable | What it turns on | Cost (checked Nov 2026) |
+|---|---|---|
+| `WEB_RISK_API_KEY` | Link reputation check (Google Cloud Web Risk API, Lookup) | First 100,000 lookups a month free, then $0.50 per 1,000 |
+| `HIBP_API_KEY` | Email breach check (haveibeenpwned.com/API/Key) | From $4.39 a month (Core 1, billed yearly, 10 lookups a minute) |
+| `SHIELD_MODEL` | Optional model override for Claude scans | Uses the normal Claude API pricing |
+
+Before relying on the email breach check at scale, add email verification (sign-up doesn't verify emails yet), so people can only look up addresses they own.
+
 ## Layout
 
 | Path | What it is |
@@ -113,11 +131,12 @@ Until Resend is set up, "Forgot password?" can't send email (the link only goes 
 | `src/lib/billing.ts`, `src/app/api/billing/*`, `src/app/api/stripe/webhook` | Stripe checkout, portal, webhook |
 | `src/app/pricing`, `src/app/account`, `src/app/signin`, `src/app/signup` | Pricing, account, and auth pages |
 | `src/app/admin`, `src/lib/admin.ts`, `src/app/api/admin/*` | Owner/admin dashboard and account suspension |
+| `src/app/shield`, `src/components/ShieldPanel.tsx`, `src/lib/shield.ts`, `src/lib/alerts.ts`, `src/app/api/shield/*` | Rehua Shield: scam scan, official alerts, breach checks |
 
 ## Before production
 
 - Email verification, and optionally Google/Apple sign-in.
 - Replace polling with WebSockets/SSE for lower handoff latency.
 - Native mobile and car apps (CarPlay / Android Auto).
-- Rehua Shield: OAuth connectors (Gmail, Microsoft, social accounts) with per-account consent and revocation.
+- Rehua Shield next steps: opt-in breach monitoring with alerts (needs stored consent and a scheduled job), and a threat check inside chat when someone pastes a link.
 - Video creation pipeline.

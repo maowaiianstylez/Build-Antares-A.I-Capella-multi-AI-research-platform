@@ -15,6 +15,9 @@ export function SiteHeader() {
           <Link href="/#sync" className="hidden hover:text-foreground md:inline">
             Sync
           </Link>
+          <Link href="/shield" className="hidden hover:text-foreground sm:inline">
+            Shield
+          </Link>
           <Link href="/pricing" className="hover:text-foreground">
             Pricing
           </Link>
