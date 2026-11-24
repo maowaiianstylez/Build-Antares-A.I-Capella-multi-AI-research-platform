@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { emailList, ownerResetEnabled } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { emailEnabled } from "@/lib/email";
+import { billingStatus } from "@/lib/billing";
 
 // Used by the hosting platform to check the app and its database are up.
 export async function GET() {
@@ -17,6 +18,7 @@ export async function GET() {
         ownerEmails: emailList(process.env.OWNER_EMAILS).size,
         resetEmails: emailEnabled(),
         ownerReset: ownerResetEnabled(),
+        ...billingStatus(),
       },
     });
   } catch (err) {

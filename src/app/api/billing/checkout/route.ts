@@ -1,5 +1,5 @@
 import { currentUser, updateUser } from "@/lib/auth";
-import { ACTIVE_STATUSES, appUrl, billingEnabled, lineItemFor, stripe } from "@/lib/billing";
+import { ACTIVE_STATUSES, appUrl, billingEnabled, openPortal, priceFor, stripe } from "@/lib/billing";
 
 // POST { plan: "pro" | "max" } -> { url } of a Stripe Checkout page.
 export async function POST(request: Request) {
@@ -23,10 +23,7 @@ async function handle(request: Request) {
   const base = appUrl(request);
   // Already subscribed: changes and cancellations go through the billing portal instead.
   if (user.stripeCustomerId && user.subscriptionStatus && ACTIVE_STATUSES.has(user.subscriptionStatus)) {
-    const portal = await stripe().billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
-      return_url: `${base}/account`,
-    });
+    const portal = await openPortal(user.stripeCustomerId, `${base}/account`);
     return Response.json({ url: portal.url });
   }
 
@@ -45,7 +42,7 @@ async function handle(request: Request) {
     mode: "subscription",
     customer: customerId,
     client_reference_id: user.id,
-    line_items: [lineItemFor(plan)],
+    line_items: [{ price: (await priceFor(plan)).id, quantity: 1 }],
     metadata: { userId: user.id, plan },
     subscription_data: { metadata: { userId: user.id, plan } },
     allow_promotion_codes: true,
