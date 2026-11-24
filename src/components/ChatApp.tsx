@@ -10,6 +10,7 @@ import { useVoice } from "@/components/useVoice";
 import InstallButton from "@/components/InstallButton";
 import type { PublicUser } from "@/lib/auth";
 import { PLANS } from "@/lib/plans";
+import { loadPreferences } from "@/lib/preferences";
 
 type Source = { url: string; title: string };
 type PanelEntry = { provider: string; name: string; company: string; model: string; text?: string; error?: string };
@@ -54,6 +55,7 @@ export default function ChatApp() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [device, setDevice] = useState("Computer");
   const [readAloud, setReadAloud] = useState(false);
+  const [enterToSend, setEnterToSend] = useState(true);
   const [handsFree, setHandsFree] = useState(false);
   const handsFreeRef = useRef(false);
   useEffect(() => {
@@ -73,14 +75,25 @@ export default function ChatApp() {
     const data = await res.json();
     setUser(data.user);
     setLive(data.live);
-    setProviders(data.providers ?? []);
+    // Models switched off on the Plugins page stay out of the picker on this device.
+    const prefs = loadPreferences();
+    setProviders(((data.providers ?? []) as Provider[]).filter((p) => !prefs.disabledModels.includes(p.id)));
+    return { user: data.user as PublicUser, providers: (data.providers ?? []) as Provider[] };
   }, [router]);
 
   // Every device signed into the same account shares one conversation space.
   useEffect(() => {
     (async () => {
-      await loadMe();
+      const me = await loadMe();
       setDevice(detectDevice());
+      // Apply the choices saved on the Settings page.
+      if (!me) return;
+      const prefs = loadPreferences();
+      const available = me.providers.filter((p) => !prefs.disabledModels.includes(p.id));
+      if (available.some((p) => p.id === prefs.defaultModel)) setModel(prefs.defaultModel);
+      if (prefs.deepDiveDefault && PLANS[me.user.plan].research) setResearch(true);
+      setReadAloud(prefs.readAloud);
+      setEnterToSend(prefs.enterToSend);
     })();
   }, [loadMe]);
 
@@ -290,6 +303,14 @@ export default function ChatApp() {
             🔗 Link another device
           </button>
           <InstallButton className="mt-2" />
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Link href="/plugins" className="rounded-xl px-3 py-2 text-center text-sm text-muted hover:bg-surface-2 hover:text-foreground">
+              🧩 Plugins
+            </Link>
+            <Link href="/settings" className="rounded-xl px-3 py-2 text-center text-sm text-muted hover:bg-surface-2 hover:text-foreground">
+              ⚙️ Settings
+            </Link>
+          </div>
           {user && (
             <Link
               href="/account"
@@ -482,7 +503,7 @@ export default function ChatApp() {
                 value={voice.listening ? voice.interim : input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && enterToSend) {
                     e.preventDefault();
                     send();
                   }
