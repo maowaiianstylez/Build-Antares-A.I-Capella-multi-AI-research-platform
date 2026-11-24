@@ -52,21 +52,33 @@ type UserRow = {
   suspended_at: Date | null;
 };
 
-const emailList = (value: string | undefined) =>
-  new Set((value ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+/**
+ * Reads a list of emails from an environment variable. Forgiving on purpose, because these are
+ * typed by hand into the hosting dashboard: commas, semicolons, spaces or new lines all separate
+ * entries; quotes, angle brackets and a pasted "NAME=" prefix are ignored; case doesn't matter.
+ */
+export const emailList = (value: string | undefined) =>
+  new Set(
+    (value ?? "")
+      .trim()
+      .replace(/^[A-Z_]+\s*=\s*/, "")
+      .split(/[\s,;]+/)
+      .map((e) => e.replace(/^[\s"'`<\[(]+|[\s"'`>\])]+$/g, "").replace(/^mailto:/i, "").toLowerCase())
+      .filter((e) => e.includes("@")),
+  );
 
 /** Emails in OWNER_EMAILS (comma-separated) always get the Max plan, so the owner can test every feature for free. */
 const ownerEmails = () => emailList(process.env.OWNER_EMAILS);
-export const isOwnerEmail = (email: string) => ownerEmails().has(email.toLowerCase());
+export const isOwnerEmail = (email: string) => ownerEmails().has(normalizeEmail(email));
 
 /** Emails in ADMIN_EMAILS or OWNER_EMAILS (comma-separated) can open the admin dashboard at /admin. */
 export const isAdminEmail = (email: string) => {
-  const e = email.toLowerCase();
+  const e = normalizeEmail(email);
   return emailList(process.env.ADMIN_EMAILS).has(e) || ownerEmails().has(e);
 };
 
 const planFor = (r: UserRow): PlanId =>
-  ownerEmails().has(r.email.toLowerCase()) ? "max" : isPlanId(r.plan) ? r.plan : "free";
+  ownerEmails().has(normalizeEmail(r.email)) ? "max" : isPlanId(r.plan) ? r.plan : "free";
 
 const toUser = (r: UserRow): User => ({
   id: r.id,
@@ -297,3 +309,9 @@ export async function resetPassword(token: string, password: string) {
     return hit.user_id;
   });
 }
+
+/**
+ * Owner reset (no email needed) is on when OWNER_RESET_CODE is set to 12+ characters.
+ * See /api/auth/owner-reset.
+ */
+export const ownerResetEnabled = () => (process.env.OWNER_RESET_CODE ?? "").trim().length >= 12;
