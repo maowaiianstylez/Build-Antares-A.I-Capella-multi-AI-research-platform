@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isNativeApp } from "@/lib/native";
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
@@ -11,6 +12,8 @@ export default function InstallButton({ className = "" }: { className?: string }
   const [showIosHelp, setShowIosHelp] = useState(false);
 
   useEffect(() => {
+    // Already inside the App Store / Google Play app: nothing to install.
+    if (isNativeApp()) return;
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
     const onPrompt = (e: Event) => {
       e.preventDefault();

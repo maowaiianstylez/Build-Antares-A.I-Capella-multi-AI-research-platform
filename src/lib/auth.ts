@@ -121,6 +121,18 @@ async function verifyPassword(password: string, stored: string) {
   return expected.length === key.length && crypto.timingSafeEqual(expected, key);
 }
 
+/** Checks a signed-in user's password again before something irreversible, like deleting the account. */
+export const checkPassword = (user: User, password: string) => verifyPassword(password, user.passwordHash);
+
+/**
+ * Permanently deletes an account. Sessions, device codes, reset links, push tokens, conversations
+ * and messages go with it (the foreign keys cascade). Content reports stay, unlinked from the account.
+ */
+export async function deleteUserAccount(id: string) {
+  const sql = await db();
+  await sql`delete from users where id = ${id}`;
+}
+
 async function selectUser(where: string, value: string) {
   const sql = await db();
   const [row] = await sql.unsafe<UserRow[]>(`select ${userColumns()} from users where ${where} = $1`, [value]);

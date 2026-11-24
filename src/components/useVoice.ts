@@ -3,6 +3,7 @@
 // Voice in and out using the browser's built-in speech engines (no extra service or key).
 // Speech recognition works in Chrome, Edge, and Safari; speaking works in every modern browser.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNativeApp, nativeListen, nativeSpeechAvailable, type NativeListenHandle } from "@/lib/native";
 
 type Recognition = {
   lang: string;
@@ -45,6 +46,9 @@ export function useVoice({ onFinalTranscript }: { onFinalTranscript: (text: stri
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState("");
   const recRef = useRef<Recognition | null>(null);
+  // Inside the iPhone/Android app, the phone's own speech engine is used instead of the browser's.
+  const nativeRef = useRef<NativeListenHandle | null>(null);
+  const useNative = useRef(false);
   const finalCb = useRef(onFinalTranscript);
 
   useEffect(() => {
@@ -52,17 +56,51 @@ export function useVoice({ onFinalTranscript }: { onFinalTranscript: (text: stri
   }, [onFinalTranscript]);
 
   useEffect(() => {
-    const t = setTimeout(() =>
-      setSupported({ listen: Boolean(getRecognition()), speak: typeof window !== "undefined" && "speechSynthesis" in window }),
-    );
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const speak = typeof window !== "undefined" && "speechSynthesis" in window;
+    (async () => {
+      const native = isNativeApp() && (await nativeSpeechAvailable());
+      useNative.current = native;
+      if (!cancelled) setSupported({ listen: native || Boolean(getRecognition()), speak });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stopListening = useCallback(() => {
     recRef.current?.stop();
+    nativeRef.current?.stop();
   }, []);
 
   const listen = useCallback(() => {
+    if (useNative.current) {
+      if (nativeRef.current) return;
+      window.speechSynthesis?.cancel();
+      setListening(true);
+      const pending: NativeListenHandle = { stop: async () => {} };
+      nativeRef.current = pending;
+      nativeListen(navigator.language || "en-US", setInterim, (text) => {
+        nativeRef.current = null;
+        setListening(false);
+        setInterim("");
+        if (text) finalCb.current(text);
+      })
+        .then((handle) => {
+          if (!handle) {
+            // Microphone or speech permission was refused.
+            nativeRef.current = null;
+            setListening(false);
+          } else if (nativeRef.current === pending) {
+            nativeRef.current = handle;
+          }
+        })
+        .catch(() => {
+          nativeRef.current = null;
+          setListening(false);
+        });
+      return;
+    }
     const Rec = getRecognition();
     if (!Rec || recRef.current) return;
     window.speechSynthesis?.cancel();
@@ -123,6 +161,7 @@ export function useVoice({ onFinalTranscript }: { onFinalTranscript: (text: stri
   useEffect(
     () => () => {
       recRef.current?.abort();
+      nativeRef.current?.stop();
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     },
     [],

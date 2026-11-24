@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PlanId } from "@/lib/plans";
+import { isNativeApp, openInBrowser } from "@/lib/native";
 
 export default function UpgradeButton({ plan, label }: { plan: Exclude<PlanId, "free">; label: string }) {
   const router = useRouter();
@@ -23,7 +24,13 @@ export default function UpgradeButton({ plan, label }: { plan: Exclude<PlanId, "
     }
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.url) {
-      window.location.assign(data.url);
+      if (isNativeApp()) {
+        // Pay in the phone's browser (Apple Pay / Google Pay and saved cards work there), then come back.
+        await openInBrowser(data.url, () => router.push("/account"));
+        setBusy(false);
+      } else {
+        window.location.assign(data.url);
+      }
       return;
     }
     setError(data.error ?? "Couldn't start checkout.");

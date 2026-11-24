@@ -69,6 +69,38 @@ create table if not exists attempts (
   at timestamptz not null default now()
 );
 create index if not exists attempts_key_idx on attempts(key, at);
+
+-- Phone and tablet app installs that asked for notifications (one row per device).
+create table if not exists push_tokens (
+  token text primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  platform text not null,
+  updated_at timestamptz not null default now()
+);
+create index if not exists push_tokens_user_idx on push_tokens(user_id);
+
+-- Answers people flagged as harmful or wrong (required by Google Play's AI-generated content policy).
+-- Kept after an account is deleted, without the link to the account, so abuse patterns can be reviewed.
+create table if not exists content_reports (
+  id uuid primary key,
+  user_id uuid references users(id) on delete set null,
+  conversation_id uuid,
+  message_id uuid,
+  reason text not null,
+  details text,
+  excerpt text,
+  created_at timestamptz not null default now()
+);
+
+-- Messages sent from the support page, including account deletion requests from people who can't sign in.
+create table if not exists support_requests (
+  id uuid primary key,
+  email text not null,
+  topic text not null,
+  message text not null,
+  user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
 `;
 
 function connect() {

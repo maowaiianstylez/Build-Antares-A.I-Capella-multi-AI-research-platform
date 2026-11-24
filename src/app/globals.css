@@ -65,3 +65,16 @@ body {
 .prose-antares table { border-collapse: collapse; margin: 0.8em 0; display: block; overflow-x: auto; }
 .prose-antares th, .prose-antares td { border: 1px solid var(--border); padding: 0.35em 0.7em; }
 .prose-antares blockquote { border-left: 3px solid var(--antares); padding-left: 0.9em; color: var(--muted); }
+
+/* Privacy policy, terms and support pages */
+.legal { line-height: 1.7; }
+.legal h2 { margin-top: 2.25rem; font-size: 1.25rem; font-weight: 600; scroll-margin-top: 5rem; }
+.legal h3 { margin-top: 1.25rem; font-weight: 600; }
+.legal p, .legal ul { margin-top: 0.75rem; color: color-mix(in srgb, var(--foreground) 88%, transparent); }
+.legal ul { list-style: disc; padding-left: 1.25rem; }
+.legal li + li { margin-top: 0.35rem; }
+.legal a { color: var(--capella); text-decoration: underline; }
+
+/* Short confirmation pill (e.g. "Answer copied"); removes itself when the animation ends. */
+@keyframes toast-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+.toast { animation: toast-fade 2.5s ease-in forwards; }

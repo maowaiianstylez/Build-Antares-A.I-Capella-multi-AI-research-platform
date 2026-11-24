@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StarMark } from "@/components/Logo";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const capabilities = [
   {
@@ -194,12 +195,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-border/60">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between sm:px-6">
-          <span>© 2026 Rehua A.I Systems</span>
-          <span>Rehua A.I Capella, for personal and commercial use.</span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
