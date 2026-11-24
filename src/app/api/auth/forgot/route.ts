@@ -1,6 +1,6 @@
 import { createPasswordReset, findUserByEmail, normalizeEmail } from "@/lib/auth";
 import { appUrl } from "@/lib/billing";
-import { sendEmail } from "@/lib/email";
+import { emailEnabled, sendEmail } from "@/lib/email";
 import { clientIp, tooManyAttempts } from "@/lib/rate-limit";
 
 // POST { email } -> emails a reset link. Always answers the same way so it can't be used
@@ -20,5 +20,6 @@ export async function POST(request: Request) {
       `Hi ${user.name},\n\nSomeone asked to reset the password for your Rehua A.I Capella account. If it was you, open this link within an hour:\n\n${link}\n\nIf it wasn't you, you can ignore this email and your password stays the same.\n\nRehua A.I Systems`,
     );
   }
-  return Response.json({ ok: true });
+  // Doesn't reveal anything about accounts; it only lets the page say that no email will arrive.
+  return Response.json({ ok: true, emailConfigured: emailEnabled() });
 }

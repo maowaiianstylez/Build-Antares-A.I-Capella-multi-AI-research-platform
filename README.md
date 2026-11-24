@@ -89,6 +89,12 @@ To use every feature yourself without paying, set `OWNER_EMAILS` to your account
 
 Admins are the accounts whose emails are in `ADMIN_EMAILS` (comma-separated). Emails in `OWNER_EMAILS` are admins too. As with `OWNER_EMAILS`, sign up with the email before adding it. Admins can't suspend themselves or each other. An "Admin dashboard" button appears on the account page for admins; everyone else gets a 404 at `/admin` and `/api/admin/*`.
 
+The email lists are forgiving: commas, semicolons, spaces or new lines all work as separators, and quotes or capital letters don't matter. Railway only applies a variable change after you press **Deploy** on the banner it shows, so the app needs a redeploy before a new admin takes effect. `/api/health` reports how many admin and owner emails the running app sees (counts only, never the addresses).
+
+### Owner password reset without email
+
+Until Resend is set up, "Forgot password?" can't send email (the link only goes to the server log). For the owner, set `OWNER_RESET_CODE` to a long private code (12+ characters). Then open `/owner-reset`, enter an email that's in `ADMIN_EMAILS` or `OWNER_EMAILS` plus that code, and you'll be taken to the normal "choose a new password" page. It's off when `OWNER_RESET_CODE` isn't set, it only works for admin emails, and it allows 5 tries per 15 minutes. Remove the variable once email works if you like.
+
 ## Layout
 
 | Path | What it is |
