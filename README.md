@@ -71,6 +71,15 @@ Add any of these keys; each provider is optional and is used only when its key i
 
 Providers rename models often. Check each provider's model list when you add a key and set the `*_MODEL` variable if the default has changed. ChatGPT, Gemini, Grok and DeepSeek are called through their OpenAI-compatible endpoints (`src/lib/providers.ts`).
 
+## Phone and tablet apps
+
+The iPhone, iPad and Android apps live in `ios/` and `android/` (Capacitor). They load this site and add push
+notifications, native speech recognition, the share sheet and haptics. Building, signing and the server
+variables they use (`SUPPORT_EMAIL`, push keys) are in [docs/MOBILE_APPS.md](docs/MOBILE_APPS.md).
+
+Store requirements that are part of the website: account deletion on `/account`, a Report button under every
+answer, and the `/privacy`, `/terms` and `/support` pages.
+
 ## Turning on payments (Stripe)
 
 1. Create a Stripe account and copy the **secret key** (start with test mode, `sk_test_...`) into `STRIPE_SECRET_KEY`.

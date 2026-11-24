@@ -2,6 +2,7 @@ import { runAntares, type Mode, type ModelChoice } from "@/lib/antares";
 import { isProviderId } from "@/lib/providers";
 import { consumeMessage, currentUser } from "@/lib/auth";
 import { DEEP_DIVE_COST, PLANS } from "@/lib/plans";
+import { notifyUser } from "@/lib/push";
 import { appendMessage, getConversation, updateMessage, type PanelEntry, type Source } from "@/lib/store";
 
 const MAX_INPUT = 20_000;
@@ -100,6 +101,12 @@ export async function POST(request: Request) {
       }
       await sync(false);
       send({ type: "done" });
+      // A Deep Dive can take a minute or two, so let the person's phone know when it's ready.
+      // (The apps don't show the alert while Rehua is open on screen.)
+      if (mode === "research") {
+        const preview = full.replace(/[#*_`>\[\]]/g, "").trim().slice(0, 120);
+        void notifyUser(user.id, "Your Deep Dive is ready", preview || "Tap to read the answer.", "/chat");
+      }
       if (open) controller.close();
     },
   });

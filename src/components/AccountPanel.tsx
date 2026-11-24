@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PLANS, formatPrice } from "@/lib/plans";
 import type { PublicUser } from "@/lib/auth";
+import DeleteAccount from "@/components/DeleteAccount";
+import { isNativeApp, openInBrowser, unregisterPush } from "@/lib/native";
 
 export default function AccountPanel() {
   const router = useRouter();
@@ -30,11 +32,13 @@ export default function AccountPanel() {
   async function openPortal() {
     const res = await fetch("/api/billing/portal", { method: "POST" });
     const data = await res.json().catch(() => ({}));
-    if (data.url) window.location.assign(data.url);
+    if (data.url && isNativeApp()) await openInBrowser(data.url, () => window.location.reload());
+    else if (data.url) window.location.assign(data.url);
     else setError(data.error ?? "Couldn't open billing.");
   }
 
   async function signOut() {
+    await unregisterPush();
     await fetch("/api/auth/signout", { method: "POST" });
     router.push("/");
   }
@@ -110,6 +114,8 @@ export default function AccountPanel() {
           Sign out
         </button>
       </div>
+
+      <DeleteAccount paid={user.plan !== "free" && !!user.subscriptionStatus && user.subscriptionStatus !== "canceled"} />
     </main>
   );
 }

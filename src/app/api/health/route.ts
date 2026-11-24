@@ -3,6 +3,8 @@ import { emailList, ownerResetEnabled } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { emailEnabled } from "@/lib/email";
 import { billingStatus } from "@/lib/billing";
+import { pushStatus } from "@/lib/push";
+import { supportEmail } from "@/lib/site";
 
 // Used by the hosting platform to check the app and its database are up.
 export async function GET() {
@@ -19,6 +21,8 @@ export async function GET() {
         resetEmails: emailEnabled(),
         ownerReset: ownerResetEnabled(),
         ...billingStatus(),
+        supportEmail: Boolean(supportEmail()),
+        push: pushStatus(),
       },
     });
   } catch (err) {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import UpgradeButton from "@/components/UpgradeButton";
 import { PLANS, formatPrice } from "@/lib/plans";
 
@@ -57,9 +58,20 @@ export default function PricingPage() {
           ))}
         </div>
         <p className="mt-10 text-center text-xs text-muted">
-          Prices in USD. Payments are processed securely by Stripe. Rehua never sees your card number.
+          Prices in USD. Paid plans renew automatically every month until you cancel, and you can cancel any time
+          from your account page. Payments are processed securely by Stripe. Rehua never sees your card number. See
+          the{" "}
+          <Link href="/terms#billing" className="underline">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { useVoice } from "@/components/useVoice";
 import InstallButton from "@/components/InstallButton";
 import type { PublicUser } from "@/lib/auth";
 import { PLANS } from "@/lib/plans";
+import { registerForPush, shareText, tapFeedback } from "@/lib/native";
 
 type Source = { url: string; title: string };
 type PanelEntry = { provider: string; name: string; company: string; model: string; text?: string; error?: string };
@@ -23,6 +24,8 @@ type Message = {
   modelName?: string;
   device?: string;
   streaming?: boolean;
+  /** The saved message's id, learned when a reply starts streaming (ids from the server already are). */
+  serverId?: string;
 };
 type ConvoSummary = { id: string; title: string; updatedAt: number };
 
@@ -55,6 +58,8 @@ export default function ChatApp() {
   const [device, setDevice] = useState("Computer");
   const [readAloud, setReadAloud] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
+  const [reporting, setReporting] = useState<Message | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const handsFreeRef = useRef(false);
   useEffect(() => {
     handsFreeRef.current = handsFree;
@@ -81,6 +86,8 @@ export default function ChatApp() {
     (async () => {
       await loadMe();
       setDevice(detectDevice());
+      // In the iPhone/Android app: ask once for notifications, so a long Deep Dive can ping when it's done.
+      registerForPush();
     })();
   }, [loadMe]);
 
@@ -146,6 +153,7 @@ export default function ChatApp() {
 
     setInput("");
     setNotice(null);
+    tapFeedback();
     setSending(true);
     sendingRef.current = true;
     setStatus(research ? "Starting Deep Dive…" : "Thinking…");
@@ -195,7 +203,9 @@ export default function ChatApp() {
         for (const line of lines) {
           if (!line.trim()) continue;
           const ev = JSON.parse(line);
-          if (ev.type === "text") {
+          if (ev.type === "start") {
+            patchReply((m) => ({ ...m, serverId: ev.messageId }));
+          } else if (ev.type === "text") {
             setStatus(null);
             replyText += ev.text;
             patchReply((m) => ({ ...m, text: m.text + ev.text }));
@@ -213,6 +223,7 @@ export default function ChatApp() {
         }
       }
       finished = true;
+      tapFeedback("success");
     } catch {
       patchReply((m) => ({ ...m, text: m.text || "_Couldn't reach Rehua. Please try again._" }));
     } finally {
@@ -415,13 +426,33 @@ export default function ChatApp() {
                         {m.text}
                       </ReactMarkdown>
                     </div>
-                    {!m.streaming && m.text && voice.supported.speak && (
-                      <button
-                        onClick={() => (voice.speaking ? voice.stopSpeaking() : voice.speak(m.text))}
-                        className="mt-1 text-xs text-muted hover:text-capella"
-                      >
-                        {voice.speaking ? "■ Stop" : "🔊 Listen"}
-                      </button>
+                    {!m.streaming && m.text && (
+                      <div className="mt-1 flex flex-wrap gap-4 text-xs text-muted">
+                        {voice.supported.speak && (
+                          <button
+                            onClick={() => (voice.speaking ? voice.stopSpeaking() : voice.speak(m.text))}
+                            className="hover:text-capella"
+                          >
+                            {voice.speaking ? "■ Stop" : "🔊 Listen"}
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            const sourceList = (m.sources ?? []).map((s, i) => `[${i + 1}] ${s.url}`).join("\n");
+                            const result = await shareText(
+                              "Answer from Rehua",
+                              `${m.text}${sourceList ? `\n\nSources:\n${sourceList}` : ""}\n\nFrom Rehua A.I Capella`,
+                            );
+                            if (result === "copied") setToast("Answer copied");
+                          }}
+                          className="hover:text-capella"
+                        >
+                          ↗ Share
+                        </button>
+                        <button onClick={() => setReporting(m)} className="hover:text-antares">
+                          ⚑ Report
+                        </button>
+                      </div>
                     )}
                     {m.streaming && !m.text && (
                       <p className="animate-pulse text-sm text-muted">{status ?? "Rehua is answering…"}</p>
@@ -556,6 +587,25 @@ export default function ChatApp() {
       </main>
 
       {linkOpen && <LinkDialog onClose={() => setLinkOpen(false)} />}
+      {reporting && (
+        <ReportDialog
+          conversationId={activeId}
+          messageId={reporting.serverId ?? (reporting.id.startsWith("pending-") ? null : reporting.id)}
+          onClose={(sent) => {
+            setReporting(null);
+            if (sent) setToast("Thanks. We'll review this answer.");
+          }}
+        />
+      )}
+      {toast && (
+        <div
+          role="status"
+          onAnimationEnd={() => setToast(null)}
+          className="toast fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-surface px-4 py-2 text-sm shadow-lg"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -621,6 +671,91 @@ function LinkDialog({ onClose }: { onClose: () => void }) {
           Done
         </button>
       </div>
+    </div>
+  );
+}
+
+const REPORT_REASONS = [
+  ["harmful", "Dangerous or harmful"],
+  ["offensive", "Hateful, harassing or offensive"],
+  ["sexual", "Sexual or inappropriate"],
+  ["wrong", "Wrong or misleading"],
+  ["privacy", "Shares private information"],
+  ["other", "Something else"],
+] as const;
+
+/** Flag an answer for review (Google Play's AI-generated content policy requires this in the app). */
+function ReportDialog({
+  conversationId,
+  messageId,
+  onClose,
+}: {
+  conversationId: string | null;
+  messageId: string | null;
+  onClose: (sent: boolean) => void;
+}) {
+  const [reason, setReason] = useState<string>("harmful");
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, messageId, reason, details }),
+    });
+    if (res.ok) return onClose(true);
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Couldn't send the report. Please try again.");
+    setBusy(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => onClose(false)}>
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6"
+      >
+        <h2 className="text-lg font-semibold">Report this answer</h2>
+        <p className="mt-1 text-sm text-muted">Our team reviews every report. Thanks for helping keep Rehua safe.</p>
+        <div className="mt-4 space-y-2">
+          {REPORT_REASONS.map(([value, label]) => (
+            <label key={value} className="flex items-center gap-2 text-sm">
+              <input type="radio" name="reason" value={value} checked={reason === value} onChange={() => setReason(value)} />
+              {label}
+            </label>
+          ))}
+        </div>
+        <textarea
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          maxLength={2000}
+          rows={3}
+          placeholder="Anything else we should know? (optional)"
+          className="mt-4 w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm"
+        />
+        {error && <p className="mt-2 text-sm text-antares">{error}</p>}
+        <div className="mt-4 flex gap-3">
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex-1 rounded-full bg-antares py-2 text-sm font-medium text-background disabled:opacity-50"
+          >
+            {busy ? "Sending…" : "Send report"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onClose(false)}
+            className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-surface-2"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
