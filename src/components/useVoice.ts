@@ -3,6 +3,7 @@
 // Voice in and out using the browser's built-in speech engines (no extra service or key).
 // Speech recognition works in Chrome, Edge, and Safari; speaking works in every modern browser.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { loadPreferences } from "@/lib/preferences";
 
 type Recognition = {
   lang: string;
@@ -100,10 +101,12 @@ export function useVoice({ onFinalTranscript }: { onFinalTranscript: (text: stri
     const text = speakableText(markdown);
     if (!text) return onDone?.();
     // Long answers are split into sentences; some browsers stop speaking very long utterances.
+    const rate = loadPreferences().voiceRate;
     const parts = text.match(/[^.!?]+[.!?]*/g) ?? [text];
     parts.forEach((part, i) => {
       const u = new SpeechSynthesisUtterance(part.trim());
       u.lang = navigator.language || "en-US";
+      u.rate = rate;
       if (i === 0) u.onstart = () => setSpeaking(true);
       if (i === parts.length - 1) {
         u.onend = () => {

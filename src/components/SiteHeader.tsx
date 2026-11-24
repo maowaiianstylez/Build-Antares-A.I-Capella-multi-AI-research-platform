@@ -18,7 +18,13 @@ export function SiteHeader() {
           <Link href="/pricing" className="hover:text-foreground">
             Pricing
           </Link>
-          <Link href="/signin" className="hidden hover:text-foreground sm:inline">
+          <Link href="/plugins" className="hidden hover:text-foreground sm:inline">
+            Plugins
+          </Link>
+          <Link href="/settings" className="hidden hover:text-foreground sm:inline">
+            Settings
+          </Link>
+          <Link href="/signin" className="hidden hover:text-foreground lg:inline">
             Sign in
           </Link>
           <Link
