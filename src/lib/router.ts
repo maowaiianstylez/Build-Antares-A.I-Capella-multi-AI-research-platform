@@ -1,6 +1,6 @@
 // Rehua Auto: picks which AI answers a chat message based on what kind of task it is.
 // Rules are deliberately simple and readable; tune them as real usage data comes in.
-import type { ProviderId } from "./providers";
+import { rehuaMode, type ProviderId } from "./providers";
 
 export type Task = "long document" | "current events" | "coding" | "math" | "writing" | "humor" | "general";
 
@@ -8,7 +8,7 @@ type Rule = { task: Task; test: (text: string) => boolean; prefer: ProviderId[] 
 
 const has = (re: RegExp) => (t: string) => re.test(t);
 
-// First matching rule wins. Each list is tried in order, skipping providers without a key.
+// First matching rule wins. Each list is tried in order, skipping providers that aren't connected.
 // Auto only routes to core (US-hosted) providers; DeepSeek and Kimi must be picked by hand.
 const RULES: Rule[] = [
   // Gemini handles very long inputs well and at low cost.
@@ -39,7 +39,16 @@ const RULES: Rule[] = [
 
 const GENERAL: ProviderId[] = ["claude", "openai", "gemini", "grok"];
 
+const unique = (ids: ProviderId[]) => [...new Set(ids)];
+
+/**
+ * The providers to try for a message, best first. In "hybrid" mode Rehua's own model is the
+ * last resort; in "rehua-first" and "independent" modes it always goes first.
+ */
 export function routeTask(text: string): { task: Task; prefer: ProviderId[] } {
   const rule = RULES.find((r) => r.test(text));
-  return rule ? { task: rule.task, prefer: [...rule.prefer, ...GENERAL] } : { task: "general", prefer: GENERAL };
+  const task = rule?.task ?? "general";
+  const partners = [...(rule?.prefer ?? []), ...GENERAL];
+  const prefer = rehuaMode() === "hybrid" ? [...partners, "rehua" as const] : ["rehua" as const, ...partners];
+  return { task, prefer: unique(prefer) };
 }

@@ -1,4 +1,5 @@
 import { runAntares, type Mode, type ModelChoice } from "@/lib/antares";
+import { isSurface } from "@/lib/persona";
 import { isProviderId } from "@/lib/providers";
 import { consumeMessage, currentUser } from "@/lib/auth";
 import { DEEP_DIVE_COST, PLANS } from "@/lib/plans";
@@ -7,7 +8,7 @@ import { appendMessage, getConversation, updateMessage, type PanelEntry, type So
 const MAX_INPUT = 20_000;
 
 /**
- * POST { conversationId, text, mode, model, device }
+ * POST { conversationId, text, mode, model, device, surface }
  * Streams newline-delimited JSON events back to the sender, and mirrors the reply
  * into the store as it grows so the user's other devices can follow along live.
  */
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
   const { conversationId, text, device } = body ?? {};
   const mode: Mode = body?.mode === "research" ? "research" : "chat";
   const choice: ModelChoice = isProviderId(body?.model) ? body.model : "auto";
+  // Which device Rehua is speaking on (chat, voice, vehicle, wearable, tv, home); tunes its style.
+  const surface = isSurface(body?.surface) ? body.surface : "chat";
 
   if (mode === "research" && !plan.research) {
     return Response.json(
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
 
       send({ type: "start", messageId: reply.id });
       try {
-        for await (const ev of runAntares(history, mode, choice)) {
+        for await (const ev of runAntares(history, mode, choice, surface)) {
           if (ev.type === "text") full += ev.text;
           if (ev.type === "source") sources.push(ev.source);
           if (ev.type === "panel") panel.push(ev.entry);
